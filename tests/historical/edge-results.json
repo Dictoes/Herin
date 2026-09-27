@@ -1,0 +1,16 @@
+{
+  "results": [
+    "Non-PDF extension and disguised non-PDF rejected before storage",
+    "Oversized PDF rejected without a partial import",
+    "Damaged PDF fails visibly, retry exits processing, delete works",
+    "Scanned PDF remains readable; manual note survives immediate refresh",
+    "Storage failure is not reported as success; retry recovers the saved original",
+    "Recurring classes validate, save, edit, and reload",
+    "Populated schedule fits mobile; delete requires confirmation",
+    "All six explicit mode/theme combinations apply",
+    "Clear data removes study materials as well as PDFs and notes",
+    "15-minute reminder uses device timezone and does not duplicate after refresh",
+    "No uncaught browser errors in failure and schedule tests"
+  ],
+  "errors": []
+}

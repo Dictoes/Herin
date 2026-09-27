@@ -1,0 +1,16 @@
+{
+  "results": [
+    "24-page import: 72 cards, 120 questions; every page covered",
+    "PDF and formatted note reopen; rendered canvas is nonblank",
+    "PDF highlight survives immediate refresh, page changes, and zoom",
+    "Regeneration is idempotent and preserves custom notes",
+    "Extracted-text highlight persists after immediate refresh",
+    "Original download bytes match the uploaded PDF",
+    "Flashcard reveal, review progress, editing, and refresh persistence",
+    "Multiple-choice, identification, and enumeration answer checks",
+    "Theme and dark mode persist",
+    "Eight routes fit a 390px phone viewport",
+    "No browser console errors or uncaught exceptions in tested flows"
+  ],
+  "errors": []
+}

@@ -1,0 +1,8 @@
+2026-09-28 Herin Supabase verification
+Production build: PASS (197 offline resources)
+Node test suite: 34 passed, 0 failed
+Chrome simulated Supabase integration: PASS
+Actual configured login/signup screens: PASS, no console errors
+Live Supabase: read-only auth settings and added-column checks PASS
+Live authenticated CRUD/email/storage/RLS: NOT RUN; no confirmed test account supplied
+See VERIFICATION.md for scope and limitations.

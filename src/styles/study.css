@@ -1,0 +1,141 @@
+.brand-logo { flex-shrink: 0; display: block; }
+.btn { text-decoration: none; }
+.badge-live { color: #236044; }
+:root[data-mode="dark"] .badge-live { color: #9de0bd; }
+:root[data-mode="dark"] .field-error { color: #ffa8a8; }
+:root[data-mode="dark"] .badge-danger { color: #ffb6b6; }
+.mobile-brand { display: none; flex-shrink: 0; }
+.next-class-card::after { display: none; }
+.next-class-name { color: #fff; }
+.filter-chips { flex-wrap: wrap; }
+.source-filter { width: min(100%, 260px); }
+.study-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.study-card { display: flex; flex-direction: column; gap: 20px; }
+.study-card h2, .quiz-card h2 { font-size: 23px; line-height: 1.4; overflow-wrap: anywhere; }
+.study-card-meta { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--ink-soft); }
+.study-card-meta > span { overflow-wrap: anywhere; min-width: 0; }
+.study-answer { border-top: 1px solid var(--border); padding-top: 16px; line-height: 1.7; overflow-wrap: anywhere; }
+.study-answer .note-actions { margin-top: 16px; }
+.reveal-answer { align-self: flex-start; }
+.study-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: auto; font-size: 13px; color: var(--ink-soft); }
+.pagination { display: flex; justify-content: center; align-items: center; gap: 16px; margin-top: 24px; font-size: 13px; }
+.quiz-card { max-width: 800px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
+.quiz-progress { display: flex; justify-content: space-between; font-size: 13px; color: var(--ink-soft); }
+.quiz-card progress { width: 100%; height: 6px; accent-color: var(--primary); }
+.quiz-options { display: grid; gap: 12px; }
+.quiz-options .btn { text-align: left; justify-content: flex-start; white-space: normal; padding: 14px; line-height: 1.5; }
+.option-letter { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--border-strong); border-radius: 6px; flex-shrink: 0; }
+.quiz-card form .btn { margin-top: 14px; }
+.quiz-feedback { border-left: 3px solid var(--primary); padding: 18px; background: var(--surface-sunken); line-height: 1.7; }
+.quiz-feedback .btn { margin-top: 16px; }
+.quiz-feedback.correct, .answer-correct { border-color: var(--success); }
+.quiz-feedback.incorrect, .answer-incorrect { border-color: var(--danger); }
+.study-note { line-height: 1.85; font-size: 14px; overflow-wrap: anywhere; }
+.study-note h2 { font-size: 23px; margin: 0 0 18px; }
+.study-note h3 { border-top: 1px solid var(--border); padding-top: 18px; margin: 26px 0 14px; font-size: 20px; }
+.study-note h4 { color: var(--primary-dark); font: 600 13px var(--font-ui); margin: 20px 0 10px; }
+.study-note p { margin: 12px 0; white-space: pre-wrap; }
+.study-note ul { margin: 8px 0; padding-left: 20px; }
+.study-note li { padding-left: 3px; }
+.coverage-report { margin-bottom: 20px; padding: 14px 0; border-block: 1px solid var(--border); font-size: 13px; color: var(--ink-soft); }
+.coverage-report summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+.coverage-report p { margin: 12px 0; }
+.coverage-pages { display: flex; flex-wrap: wrap; gap: 6px; max-height: 180px; overflow: auto; margin: 12px 0; }
+.generation-status { margin-bottom: 16px; color: var(--primary-dark); }
+.import-error { padding: 16px; border-left: 3px solid var(--danger); margin-bottom: 18px; }
+.import-error .btn { margin-top: 12px; }
+.btn { white-space: normal; justify-content: center; }
+.btn svg { flex-shrink: 0; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+.hl-swatch { min-width: 30px; min-height: 30px; }
+.notes-tabs { flex-wrap: wrap; }
+.notes-panel .textarea { line-height: 1.75; font-size: 14px; }
+.settings-row .select { max-width: 230px; }
+.switch:focus-within .track { outline: 2px solid var(--primary); outline-offset: 4px; }
+.toast-stack { max-width: calc(100vw - 32px); }
+.toast { min-width: 0; max-width: 360px; }
+.viewer-layout { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); }
+.standalone-layout { grid-template-columns: minmax(0, 1fr); }
+.viewer-panel { min-width: 0; }
+.stat-card { border-radius: 8px; }
+.pdf-thumb { background: var(--primary-tint); }
+@keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+.page-content { animation: appear .2s ease-out; }
+.study-answer, .quiz-feedback { animation: appear .16s ease-out; }
+@media (max-width: 1100px) { .viewer-layout { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 780px) {
+  .mobile-brand { display: block; }
+  .study-grid { grid-template-columns: minmax(0, 1fr); }
+  .study-card h2, .quiz-card h2 { font-size: 21px; }
+  .btn-icon { min-width: 42px; min-height: 42px; }
+  .hl-swatch { min-width: 38px; min-height: 38px; }
+  .viewer-toolbar { padding: 12px; }
+  .quiz-card { padding: 18px; }
+  .settings-row > div { min-width: 0; }
+  .topbar { position: static; }
+}
+@media (prefers-reduced-motion: reduce) { .page-content, .study-answer, .quiz-feedback { animation: none; } }
+
+/* Gizmo-style Flip Cards */
+.gizmo-card { overflow: visible; }
+.flip-container { perspective: 1000px; flex: 1; display: flex; flex-direction: column; min-height: 220px; }
+.flip-inner { position: relative; flex: 1; width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; display: flex; }
+.flip-container.flipped .flip-inner { transform: rotateY(180deg); }
+.flip-front, .flip-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; display: flex; flex-direction: column; border-radius: 8px; border: 1px solid var(--border); padding: 18px; background: var(--surface); box-sizing: border-box; overflow-y: auto; }
+.flip-front { cursor: pointer; text-align: left; align-items: flex-start; justify-content: center; border: none; }
+.flip-front:hover { background: var(--surface-sunken); }
+.flip-front h2 { margin: 0 0 12px 0; font-size: 20px; line-height: 1.4; }
+.flip-hint { font-size: 13px; color: var(--ink-soft); align-self: center; margin-top: auto; }
+.flip-back { transform: rotateY(180deg); justify-content: flex-start; }
+.study-answer-text { line-height: 1.6; margin: 0 0 16px 0; font-size: 15px; }
+.study-explanation { font-size: 13px; color: var(--ink-soft); margin: 0 0 16px 0; font-style: italic; }
+.note-actions { margin-top: auto; display: flex; gap: 8px; flex-wrap: wrap; }/* Consistent, readable study controls */
+:root {--font-display:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--hl-purple:#d7baf4;--hl-orange:#ffd1a3;}
+.topbar-title {font-size:clamp(24px,3vw,30px);}
+.study-grid {grid-template-columns:minmax(0,1fr);max-width:820px;margin:auto;}
+.study-position {text-align:center;margin:16px;color:var(--ink-soft);}
+.flip-container {min-height:360px;}
+.flip-front h2,.quiz-card h2 {font-size:clamp(24px,3vw,30px);line-height:1.5;font-weight:650;}
+.study-answer-text {font-size:22px;line-height:1.6;}
+.study-explanation,.quiz-feedback,.study-note,.notes-panel .textarea {font-size:16px;line-height:1.65;}
+.study-card-meta,.study-card-footer {font-size:14px;}
+.study-source p {white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.6;}
+.study-source summary {cursor:pointer;}
+.hl-purple {background:var(--hl-purple);color:#172334;}.hl-orange {background:var(--hl-orange);color:#172334;}
+.pdf-highlight-tools {position:relative;display:flex;flex-wrap:nowrap;overflow-x:auto;align-items:center;gap:10px;margin:0;padding:12px;background:var(--surface);border-bottom:1px solid var(--border);}
+.pdf-highlight-tools span {min-width:110px;font-size:13px;}
+.pdf-highlight-tools .hl-swatch {flex-shrink:0;min-width:38px;min-height:38px;opacity:1;border:2px solid transparent;}
+.pdf-highlight-tools .hl-swatch[aria-pressed=true] {border-color:#263c54;outline:2px solid var(--primary);outline-offset:2px;}
+.pdf-highlight-tools .hl-swatch:disabled {cursor:default;opacity:.65;}
+.viewer-panel {position:sticky;top:8px;}
+.viewer-canvas-wrap {justify-content:flex-start;}
+.pdf-page-area {margin-inline:auto;}
+.connection-status {padding:8px 24px;font-size:13px;color:var(--ink-soft);display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+.offline-settings p {line-height:1.6;margin-top:12px;}
+.main-area {padding-top:env(safe-area-inset-top);}
+.page-content {padding-bottom:calc(32px + env(safe-area-inset-bottom));}
+.btn,.select,.input {min-height:42px;}.quiz-options .btn {font-size:17px;min-height:52px;}
+@media(max-width:780px){
+ .viewer-panel {position:static;}
+ .pdf-highlight-tools {position:fixed;bottom:0;left:0;right:0;z-index:40;padding:12px max(12px,env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));box-shadow:0 -3px 16px #0002;border-top:1px solid var(--border);}
+ .pdf-highlight-tools span {min-width:90px;max-width:100px;}
+ body:has(.pdf-highlight-tools) .page-content {padding-bottom:calc(110px + env(safe-area-inset-bottom));}
+ .page-content {padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right));}
+ .viewer-canvas-wrap {max-height:65vh;padding:16px;}
+ .topbar {flex-wrap:wrap;gap:12px;}.topbar-actions {flex-wrap:wrap;}
+ .flip-container {min-height:420px;}.pagination {gap:8px;flex-wrap:wrap;}
+ .settings-row {flex-wrap:wrap;gap:12px;}.settings-row .input {max-width:100%!important;}
+}
+@media(prefers-reduced-motion:reduce){.flip-inner{transition:none;}}
+.deadline-card,.study-overview {margin:20px 0;}
+.section-heading {display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;}
+.deadline-row {display:flex;align-items:center;gap:12px;padding:16px 0;border-bottom:1px solid var(--border);}
+.deadline-row>div {flex:1;min-width:0;overflow-wrap:anywhere;}.deadline-row p {font-size:14px;color:var(--ink-soft);line-height:1.5;}
+.deadline-row input {width:20px;height:20px;flex-shrink:0;}.study-overview h2 {margin-bottom:8px;}.study-overview p {margin:10px 0;}
+
+:root {--ink-faint:#647086;}
+[data-mode="dark"] {--ink-faint:#a8b2c4;}
+.notes-panel .field-hint {font-size:14px;}
+.flip-front {color:var(--ink);}
+
+body:has(.modal-backdrop) .pdf-highlight-tools {z-index:1;}

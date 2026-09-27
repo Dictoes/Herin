@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Herin</title>
+  <rect width="512" height="512" rx="122" fill="#355C85"/>
+  <path d="M120 150c0-23.2 18.8-42 42-42h132c46.4 0 84 37.6 84 84v175c-22.6-17.3-49.1-26-79.7-26H162c-23.2 0-42-18.8-42-42V150Z" fill="#F7F8FB"/>
+  <path d="M120 150v149c0 23.2 18.8 42 42 42h136.3c30.6 0 57.1 8.7 79.7 26" fill="none" stroke="#C9D8E8" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M208 237l39 39 87-96" fill="none" stroke="#F2B705" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M157 164v154M178 164v154" stroke="#355C85" stroke-width="12" stroke-linecap="round" opacity=".3"/>
+  <path d="M163 370h210" stroke="#F2B705" stroke-width="22" stroke-linecap="round"/>
+</svg>
