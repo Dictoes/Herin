@@ -26,7 +26,7 @@ Import a PDF, open its reader, select a complete lesson idea, then choose a colo
 
 Six colors are available. The toolbar stays above the scrolling PDF on desktop and at the bottom on phones. Edit colors/comments in Highlights. Removing a mark requires confirmation; existing study items retain their source text.
 
-Only PDF-page highlights generate automatically. Extracted-text highlights remain available as annotations. Import creates a structured editable note without whole-document questions. Refresh extracted notes preserves cards and personal notes. Create clearer outline replaces notes only after confirmation.
+Highlights on PDF pages and in Extracted text both generate automatically. Existing extracted-text highlights can generate cards with the button in the Highlights tab. Import creates a structured editable note without whole-document questions. Refresh extracted notes preserves cards and personal notes. Create clearer outline replaces notes only after confirmation.
 
 Generation uses local English-language rules, not AI. Supported patterns include definitions, lists, steps, causes, comparisons, conditions and formulas. It does not invent worked calculations. Multiple-choice needs four distinct definitions in the same highlight; otherwise that format is skipped. Short or unsupported selections show a message. Review and edit generated content.
 

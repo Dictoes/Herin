@@ -26,7 +26,7 @@ test('saved highlight automatically generates linked study data; retry is idempo
  await act(async()=>app().generateForHighlight('p1',h));assert.equal(storage.getStudy().flashcards.length,4);assert.equal(storage.getStudy().flashcards[0].question,'My edited question');
  await stop();stop=await mount(root);assert.equal(app().flashcards.length,4);assert.equal(app().getHighlights('p1')[0].generationStatus,'ready');
  const previous=storage.getStudy().flashcards.length;
- await act(async()=>app().addHighlight('p1',{source:'text',text:source,start:0,end:source.length,color:'pink'}));assert.equal(storage.getStudy().flashcards.length,previous);
+ await act(async()=>app().addHighlight('p1',{source:'text',text:source,start:0,end:source.length,color:'pink'}));assert.equal(storage.getStudy().flashcards.length,previous+4);
  await stop();
 });
 test('quiz feedback, next step, persisted score, question edit and delete controls',async()=>{

@@ -6,6 +6,7 @@ import { classesForDay, toMinutes } from '../utils/scheduleUtils';
 import {generateHighlightMaterials} from '../utils/flashcardUtils';
 import usePersistedState from '../utils/usePersistedState';
 import { flushCloud } from '../utils/cloudStore';
+import { highlightPage } from '../utils/highlightPage';
 
 const AppCtx = createContext(null);
 
@@ -207,13 +208,14 @@ export function AppProvider({ children }) {
     const meta = storage.getPdfs().find(p=>p.id===pdfId);
     if (!meta) return false;
     try {
-      const result = generateHighlightMaterials(live,meta);
+      const page = highlightPage(live,storage.getExtractedTexts()[pdfId]);
+      const result = generateHighlightMaterials({...live,page},meta);
       const saved = setStudy(p=>{
         const old = new Map(p.flashcards.map(c=>[c.id,c]));
         return {...p,flashcards:[...p.flashcards.filter(c=>c.highlightId!==hl.id || c.edited),...result.flashcards.filter(c=>!old.get(c.id)?.edited).map(c=>({...c,level:old.get(c.id)?.level||0,dueAt:old.get(c.id)?.dueAt}))],quizQuestions:[...p.quizQuestions.filter(q=>q.highlightId!==hl.id || q.edited),...result.quizQuestions.filter(q=>!p.quizQuestions.some(old=>old.id===q.id && old.edited))]};
       });
       if (!saved) throw Error('Study materials could not be saved. Free browser storage and retry.');
-      setHighlightsState(p=>({...p,[pdfId]:(p[pdfId]||[]).map(h=>h.id===hl.id?{...h,generationStatus:result.flashcards.length?'ready':'empty',generationMessage:result.message}:h)}));
+      setHighlightsState(p=>({...p,[pdfId]:(p[pdfId]||[]).map(h=>h.id===hl.id?{...h,page,generationStatus:result.flashcards.length?'ready':'empty',generationMessage:result.message}:h)}));
       pushToast(result.message,result.flashcards.length?'success':'info');
       return true;
     } catch(error) {
@@ -222,9 +224,9 @@ export function AppProvider({ children }) {
     }
   },[pushToast]);
   const addHighlight = useCallback((pdfId, hl) => {
-    const entry = {...hl,id:uid('hl'),createdAt:new Date().toISOString(),generationStatus:hl.source==='pdf'?'processing':null};
+    const entry = {...hl,page:highlightPage(hl,storage.getExtractedTexts()[pdfId]),id:uid('hl'),createdAt:new Date().toISOString(),generationStatus:'processing'};
     if (!setHighlightsState(p=>({...p,[pdfId]:[...(p[pdfId]||[]),entry]}))) return null;
-    if (hl.source==='pdf') generateForHighlight(pdfId,entry);
+    generateForHighlight(pdfId,entry);
     return entry;
   },[generateForHighlight]);
 

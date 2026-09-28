@@ -118,7 +118,7 @@ export default function PDFViewer() {
 
   function processHighlightForStudy(h) { app.generateForHighlight(id,h); }
   function handleCreateHighlight({start,end,text,color}) {
-    if(addHighlight(id,{start,end,text,color,source:'text'})) pushToast('Text highlight saved. PDF-page highlights create study materials automatically.','success');
+    return addHighlight(id,{start,end,text,color,source:'text'});
   }
   function handleDeleteHighlight(hlId) { setDeleteHl(hlId); }
 
@@ -237,7 +237,7 @@ export default function PDFViewer() {
               ) : (
                 <>
                   <p className="field-hint" style={{ marginBottom: 10 }}>
-                    Select any text to highlight it. Click a highlight to remove it.
+                    Highlight a complete definition or explanation to create flashcards and quiz questions automatically. Click a highlight to remove it.
                   </p>
                   <HighlightableText
                     text={typeof extractedText === 'string' ? extractedText : (extractedText?.text || '')}
@@ -284,11 +284,11 @@ export default function PDFViewer() {
                         <select className="select" aria-label="Highlight color" value={h.color} onChange={e=>updateHighlight(id,h.id,{color:e.target.value})}>{HIGHLIGHT_COLORS.map(c=><option key={c.id} value={c.id}>{c.label}</option>)}</select>
                         <div style={{display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap', width: '100%', justifyContent: 'space-between'}}>
                           <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                            <button className="btn btn-secondary btn-sm" disabled={h.source!=='pdf'} onClick={() => processHighlightForStudy(h)}>{h.generationStatus==='error'?'Retry':'Regenerate'}</button>
-                            <span style={{fontSize: '12px'}}>{h.source === 'pdf' ? `Page ${h.page} · ` : ''}{timeAgo(h.createdAt)}</span>
+                            <button className="btn btn-secondary btn-sm" onClick={() => processHighlightForStudy(h)}>{h.generationStatus==='error'?'Retry':h.generationStatus==='ready'?'Regenerate':'Generate flashcards'}</button>
+                            <span style={{fontSize: '12px'}}>{h.page ? `Page ${h.page} · ` : ''}{timeAgo(h.createdAt)}</span>
                           </div>
                           <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                            {h.source === 'pdf' && <button className="btn btn-ghost btn-sm" onClick={()=>setPageNum(h.page)}>Go to page</button>}
+                            {h.page && meta.kind !== 'note' && <button className="btn btn-ghost btn-sm" onClick={()=>setPageNum(h.page)}>Go to page</button>}
                             <button className="btn btn-ghost btn-sm" onClick={() => handleDeleteHighlight(h.id)}>
                               <Trash2 size={13} /> Remove
                             </button>
