@@ -42,7 +42,7 @@ Alternatively, the exact CLI command with a **placeholder** is:
 npx supabase secrets set GEMINI_API_KEY=YOUR_NEW_ROTATED_KEY --project-ref ycejqtvemiesuiflyqmw
 ```
 
-Prefer the dashboard to avoid putting the real key in shell history. No real Gemini secret is stored in this repository. The backend defaults to `gemini-2.5-flash`; the optional server secret `GEMINI_MODEL` can select another compatible structured-output model. Model access and quota must be available in the Google project. Secrets are read at request time; a frontend redeploy is not needed after adding the key.
+Prefer the dashboard to avoid putting the real key in shell history. No real Gemini secret is stored in this repository. The backend defaults to `gemini-3.5-flash-lite`; the optional server secret `GEMINI_MODEL` can select another compatible structured-output model. Model access and quota must be available in the Google project. Secrets are read at request time; a frontend redeploy is not needed after adding the key.
 
 ## Frontend environment
 

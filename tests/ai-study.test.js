@@ -31,7 +31,7 @@ test('invalid answers, difficulty, page, blank output and duplicate choices are 
   assert.equal(validateOutput({...output,flashcards:[card,card]},base,section).flashcards.length,1);
 });
 test('provider errors are safe, quota is not retried, transient retry is bounded',async()=>{
-  for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'PROVIDER_UNAVAILABLE']]){
+  for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'MODEL_UNAVAILABLE']]){
     let calls=0;await assert.rejects(callGemini(section,base,{key:'private-test',fetcher:async()=>{calls++;return new Response('private source text',{status});}}),e=>e.code===code&&!e.message.includes('private'));assert.equal(calls,1);
   }
   let calls=0;await assert.rejects(callGemini(section,base,{key:'test',sleep:async()=>{},fetcher:async()=>{calls++;return new Response('',{status:503});}}),StudyError);assert.equal(calls,2);

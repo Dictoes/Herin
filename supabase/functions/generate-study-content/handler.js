@@ -43,16 +43,16 @@ export function createHandler({createClient, env, generate = generateSections}) 
       // The UI uses Herin's PDF.js extraction before invoking this function. Raw PDF bytes
       // remain private. Direct callers must also finish extraction before generating.
       const sections = sectionsFrom(pdf.data.extracted_text, topic);
-      const result = await generate(sections,input,{key:env('GEMINI_API_KEY'),model:env('GEMINI_MODEL') || 'gemini-2.5-flash'});
+      const result = await generate(sections,input,{key:env('GEMINI_API_KEY'),model:env('GEMINI_MODEL') || 'gemini-3.5-flash-lite'});
       const saved = await client.rpc('finish_study_generation',{p_id:input.requestId,p_lease:lease,p_result:result});
       if (saved.error) throw dbError(saved.error);
       return reply(saved.data);
     } catch (error) {
+      const safe = error instanceof StudyError ? error : new StudyError('UNAVAILABLE','Study generation is unavailable. Please retry later.',503);
       if (claimed) {
         // No content or provider errors are stored/logged. A lease expires if this best-effort update fails.
-        try { await client.from('study_generations').update({status:'failed'}).eq('id',input.requestId).eq('lease',lease).eq('status','processing'); } catch {}
+        try { await client.from('study_generations').update({status:'failed',result:{errorCode:safe.code}}).eq('id',input.requestId).eq('lease',lease).eq('status','processing'); } catch {}
       }
-      const safe = error instanceof StudyError ? error : new StudyError('UNAVAILABLE','Study generation is unavailable. Please retry later.',503);
       return reply({code:safe.code,message:safe.message},safe.status);
     }
   };
