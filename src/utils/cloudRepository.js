@@ -1,4 +1,5 @@
 // Explicit translation between Herin's UI model and the existing SQL schema.
+import { databaseJson } from './databaseText.js';
 const tables = ['classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','user_preferences','profiles'];
 export async function databaseId(id,userId='') {
   if (!id) return null;
@@ -63,7 +64,7 @@ export async function encodeRows(model,userId) {
   for(const [key,r] of Object.entries(model.reminders||{})) rows.reminders.push({id:await scopedId(r.id||key),user_id:userId,title:r.title||'Class reminder',remind_at:r.remindAt,is_completed:!!r.completed,related_entity_type:r.entityType||'class',related_entity_id:await scopedId(r.entityId),data:{...r,key}});
   rows.user_preferences.push({user_id:userId,theme:model.settings?.mode||'system',push_notifications:!!model.settings?.notificationsEnabled,data:{settings:model.settings||{},quizSession:model.quizSession||{}}});
   rows.profiles.push({user_id:userId,display_name:model.settings?.displayName||''});
-  return rows;
+  return databaseJson(rows);
 }
 export function createRepository(client,userId) {
   let previous;

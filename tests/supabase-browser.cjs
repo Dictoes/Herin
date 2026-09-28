@@ -9,6 +9,7 @@ const files=new Map();let rejectWrites=false,uploads=0,downloads=0;
 const jwt=()=>{const b=value=>Buffer.from(JSON.stringify(value)).toString('base64url');return b({alg:'HS256',typ:'JWT'})+'.'+b({sub:user.id,aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})+'.test';};
 const session=()=>({access_token:jwt(),refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user});
 (async()=>{
+const {databaseJson}=await import('../src/utils/databaseText.js');
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_PATH||'C:/Program Files/Google/Chrome/Application/chrome.exe'});
 try{
 const context=await browser.newContext({serviceWorkers:'block'});
@@ -26,6 +27,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   if(rejectWrites)return json({message:'Test: write denied by RLS',code:'42501'},403);
   if(method==='POST'){
    const rows=request.postDataJSON();
+   if(JSON.stringify(rows)!==JSON.stringify(databaseJson(rows)))return json({message:"unsupported Unicode escape sequence",code:"22P05"},400);
    for(const row of rows){assert.equal(row.user_id,user.id);const key=row.id?'id':'user_id';const index=tables[table].findIndex(r=>r[key]===row[key]);const saved={created_at:new Date().toISOString(),updated_at:new Date().toISOString(),...tables[table][index],...row};if(index<0)tables[table].push(saved);else tables[table][index]=saved;}
    return json(rows,201);
   }
@@ -40,7 +42,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  throw Error('Unhandled request: '+method+' '+url);
 });
-const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*403/.test(m.text()))errors.push(m.text());});
+const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*403/.test(m.text()))errors.push(m.text());});
 const base=process.env.HERIN_URL||'http://127.0.0.1:4173';
 const saved=()=>page.getByText('Saved to Supabase',{exact:true}).first().waitFor();
 const navigate=async route=>{await page.goto(base+'/#/'+route);await page.locator('.topbar-title').waitFor();};
@@ -54,12 +56,14 @@ await page.locator('.pdf-text-layer').evaluate(el=>{const span=[...el.querySelec
 await page.getByRole('button',{name:'PDF Yellow highlight',exact:true}).click();await saved();assert.ok(tables.highlights.length);assert.ok(tables.flashcards.length);assert.ok(tables.quizzes.length);
 await page.getByRole('button',{name:'Edit note',exact:true}).click();await page.getByLabel('Your notes for this file').fill('Cloud notes survive refresh.');await saved();
 const readerUrl=page.url();await page.reload();await page.locator('.pdf-overlay > div').first().waitFor();await page.getByText('Cloud notes survive refresh.',{exact:true}).waitFor();assert.ok(downloads>=2);
+await page.evaluate(userId=>{const key='herin:cloud:'+userId;const cached=JSON.parse(localStorage.getItem(key));cached.base=structuredClone(cached.model);const id=cached.model.pdfs.find(p=>p.kind!=='note').id;cached.model.extractedTexts[id].pages[0].text+='\u0000\uD800';cached.pending=true;localStorage.setItem(key,JSON.stringify(cached));},user.id);
+await page.reload();await page.locator('.topbar-title').waitFor();await saved();assert.ok(tables.pdfs[0].extracted_text.pages[0].text.endsWith('\uFFFD\uFFFD'));
 await navigate('flashcards');await page.getByRole('button',{name:'Tap to reveal answer'}).click();await page.getByRole('button',{name:'Good',exact:true}).click();await saved();assert.equal(tables.flashcards[0].data.rating,'Good');
 await navigate('quiz');const answer=page.locator('#quiz-answer');if(await answer.count()){await answer.fill('wrong answer');await page.getByRole('button',{name:'Check answer',exact:true}).click();}else await page.locator('.quiz-options button').first().click();await saved();assert.ok(tables.user_preferences[0].data.quizSession.status);
 await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await page.getByLabel('Class name',{exact:true}).fill('Cloud Biology');await page.getByRole('dialog').getByRole('button',{name:'Mon',exact:true}).click();await page.getByLabel('Start time').fill('10:00');await page.getByLabel('End time').fill('11:00');await page.getByRole('dialog').getByRole('button',{name:'Add class',exact:true}).click();await saved();assert.equal(tables.classes[0].name,'Cloud Biology');
 await page.getByRole('button',{name:'Add deadline',exact:true}).click();await page.getByLabel('Assignment',{exact:true}).fill('Cloud homework');await page.getByLabel('Due date and time').fill('2026-10-01T12:00');await page.getByRole('button',{name:'Save deadline',exact:true}).click();await saved();assert.equal(tables.assignments[0].title,'Cloud homework');
 await navigate('settings');await page.getByRole('button',{name:'Plum',exact:true}).click();await page.getByLabel('Color mode').selectOption('dark');await saved();await page.reload();await page.getByLabel('Color mode').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'plum');assert.equal(await page.locator('html').getAttribute('data-mode'),'dark');
-rejectWrites=true;await page.getByLabel('Display name').fill('Retry student');await page.getByText(/Not synced: Test: write denied by RLS/).first().waitFor();rejectWrites=false;await page.getByRole('button',{name:'Retry sync',exact:true}).first().click();await saved();assert.equal(tables.profiles[0].display_name,'Retry student');
+rejectWrites=true;await page.getByLabel('Display name').fill('Retry student');await page.getByText(/Not synced: Test: write denied by RLS/).first().waitFor();await page.reload();await page.locator('.topbar-title').waitFor();await page.getByText(/Not synced: Test: write denied by RLS/).first().waitFor();rejectWrites=false;await page.getByRole('button',{name:'Retry sync',exact:true}).first().click();await saved();assert.equal(tables.profiles[0].display_name,'Retry student');
 await context.setOffline(true);await page.getByRole('button',{name:'Forest',exact:true}).click();await page.getByText(/Not synced: Offline/).first().waitFor();await page.getByRole('button',{name:'Log out',exact:true}).click();assert.ok(await page.locator('.sidebar').count());await context.setOffline(false);await saved();assert.equal(tables.user_preferences[0].data.settings.theme,'forest');
 tables.reminders.push({id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',user_id:user.id,title:'Cloud reminder',remind_at:new Date(Date.now()-1000).toISOString(),is_completed:false,related_entity_type:'custom',data:{}});tables.user_preferences[0].push_notifications=true;
 await page.reload();await page.getByText('Cloud reminder',{exact:true}).waitFor();await saved();assert.equal(tables.reminders[0].is_completed,true);

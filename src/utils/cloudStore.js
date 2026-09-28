@@ -31,7 +31,9 @@ export async function openCloud(client,userId) {
     if(active!==ctx) return false;
     ctx.base=remote;ctx.model=cached?.pending?mergeWorkspace(cached.base||{},cached.model,remote):remote;ctx.pending=!!cached?.pending;
     persist(ctx);
-    if(ctx.pending) await flushCloud();else report('saved','Saved to Supabase');
+    // A pending write failure must not lock the user out of an already loaded
+    // workspace. Keep their queued edits available for retry and export.
+    if(ctx.pending) await flushCloud().catch(()=>{});else report('saved','Saved to Supabase');
   } catch(error) {
     if(active!==ctx) return false;
     // Offline access is possible only for a previously loaded account.
