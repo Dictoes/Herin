@@ -35,3 +35,14 @@ test('standalone note annotations and cards from removed highlights remain suppo
  const restored=decodeRows(rows);assert.equal(restored.highlights.n1[0].text,'Standalone');assert.equal(restored.study.flashcards[0].highlightId,'h1');
  assert.notEqual(await databaseId('same-legacy-id',user),await databaseId('same-legacy-id','other-user'));
 });
+
+test('new questions merge into the loaded document quiz without duplicate upsert IDs or lost questions',async()=>{
+ const existing=await encodeRows(model,user);
+ const loaded=decodeRows(existing);
+ loaded.study.quizQuestions.push({id:'new-question',pdfId:'p1',question:'List the factors',correctAnswer:'Safety; mobility',type:'enumeration',expectedItems:['Safety','mobility']});
+ const next=await encodeRows(loaded,user);
+ assert.equal(next.quizzes.length,1);
+ assert.equal(next.quizzes[0].id,existing.quizzes[0].id);
+ assert.deepEqual(next.quizzes[0].questions.map(q=>q.id),['q1','new-question']);
+ assert.equal(decodeRows(next).study.quizQuestions.length,2);
+});

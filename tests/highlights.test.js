@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generateHighlightMaterials,INCOMPLETE_HIGHLIGHT} from '../src/utils/flashcardUtils.js';
+import {generateHighlightMaterials,INCOMPLETE_HIGHLIGHT,checkQuizAnswer} from '../src/utils/flashcardUtils.js';
 const run=text=>generateHighlightMaterials({id:'h1',page:7,text},{id:'p1',name:'Course.pdf',subject:'Biology'});
 test('highlight source and identity survive every generated item',()=>{
  const text='Mitosis is cell division. Osmosis is the movement of water. Diffusion is the movement of particles. Respiration is energy release.';
@@ -30,6 +30,30 @@ test('cause, comparison, conditional and formula questions are supported by the 
 test('numbered highlighted steps become an enumeration',()=>{
  const r=run('The steps of preparation are:\n1. Measure the sample\n2. Heat the sample\n3. Record the temperature');
  const q=r.quizQuestions.find(q=>q.type==='enumeration');assert.ok(q);assert.equal(q.expectedItems.length,3);
+});
+
+test('engineering factors from the reported highlight produce a list card and answerable quiz',()=>{
+ const text='Safety, mobility, accessibility, reliability, economy, constructability, environmental effects, and long- term performance matter.';
+ const r=run(text);assert.equal(r.flashcards.length,1);assert.equal(r.quizQuestions.length,1);
+ assert.deepEqual(r.quizQuestions[0].expectedItems,['Safety','mobility','accessibility','reliability','economy','constructability','environmental effects','long-term performance']);
+ assert.ok(checkQuizAnswer(r.quizQuestions[0],r.quizQuestions[0].correctAnswer));
+ assert.ok(!checkQuizAnswer(r.quizQuestions[0],'Safety; mobility'));
+ assert.equal(r.flashcards[0].sourceText,text);assert.equal(r.flashcards[0].sourcePage,7);
+ assert.deepEqual(run(text),r);
+});
+
+test('slide bullet groups retain compound items and accept semicolon-separated quiz answers',()=>{
+ const text='Geometric and structural considerations • Traffic and flow analysis • Construction, drainage, pavements, and maintenance';
+ const r=run(text);assert.equal(r.flashcards.length,1);
+ assert.equal(r.quizQuestions[0].expectedItems.length,3);
+ assert.equal(r.quizQuestions[0].expectedItems[2],'Construction, drainage, pavements, and maintenance');
+ assert.ok(checkQuizAnswer(r.quizQuestions[0],r.quizQuestions[0].correctAnswer));
+ assert.equal(run('Topic: Safety, mobility, accessibility').flashcards.length,0);
+});
+
+test('complete statements using common engineering verbs are not silently discarded',()=>{
+ const r=run('Road drainage prevents water accumulation on the pavement surface.');
+ assert.ok(r.flashcards.length);assert.ok(r.quizQuestions.length);
 });
 
 import {validatePdf,MAX_PDF_BYTES} from '../src/utils/validatePdf.js';

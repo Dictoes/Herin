@@ -252,19 +252,54 @@ export function checkQuizAnswer(question, answer) {
   const normalize = s => String(s || '').normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
   if (question.type !== 'enumeration') return normalize(answer) === normalize(question.correctAnswer);
   const expected = (question.expectedItems || question.correctAnswer.split(/,|;/)).map(normalize);
-  const actual = String(answer).split(/,|;|\n/).map(normalize).filter(Boolean);
+  const compoundItems = (question.expectedItems || []).some(item=>item.includes(','));
+  const actual = String(answer).split(compoundItems ? /;|\n/ : /,|;|\n/).map(normalize).filter(Boolean);
   return expected.length === new Set(actual).size && expected.every(item => actual.includes(item));
 }
 
 // Only the saved highlight is supplied here; document metadata is never source text.
 export const INCOMPLETE_HIGHLIGHT = 'Highlight a complete definition, explanation, process, example, formula, or list to create study materials.';
+
+// Slides often contain lists without an introductory "includes" or "are".
+// Keep bullet groups together so commas inside a bullet do not invent items.
+function highlightedList(raw) {
+  const text = cleanText(raw).replace(/(\p{L})-\s+(?=\p{L})/gu, '$1-');
+  if (/^(?:course|subject|topic|title|lesson|chapter|unit|module|filename|metadata)\s*(?:\d+\s*)?[:–-]/i.test(text)) return null;
+  const bullets = /[•●▪‣]|(?:^|\n)\s*(?:[-*]|\d+[.)])\s+/g;
+  const marked = [...text.matchAll(bullets)];
+  let items;
+  if (marked.length >= 2) {
+    const prefix = text.slice(0,marked[0].index).trim();
+    items = text.split(bullets).slice(1);
+    if (prefix && !prefix.endsWith(':')) items.unshift(prefix);
+  } else {
+    // Explicit list introductions are handled by the existing definition rules.
+    if (/:|\b(?:includes?|contains?|consists?|are|is)\b/i.test(text)) return null;
+    const list = text.replace(/\s+(?:matter|are important|are essential)[.!]?$/i,'').replace(/[.!]$/,'');
+    items = list.split(/[,;]\s*/);
+    if (items.length < 3) return null;
+  }
+  items = items.map(item=>item.replace(/^\s*and\s+/i,'').replace(/[.;]$/,'').replace(/\s+/g,' ').trim());
+  if (items.length < 2 || items.some(item=>!item || item.split(/\s+/).length>16 || isBadLabel(item)
+    || /[.!?]|\b(?:is|are|because|when|if|whereas)\b/i.test(item))) return null;
+  return [...new Set(items)];
+}
+
 export function generateHighlightMaterials(highlight, meta = {}) {
   if (!highlight.id) throw new Error('Save the highlight before creating study materials.');
+  const items = highlightedList(highlight.text);
+  if (items?.length >= 2) {
+    const id = `${highlight.id}_list_${hash(items.join(';'))}`;
+    const question = `Which ${items.length} items are listed in this highlight?`;
+    const answer = items.join('; ');
+    const source = {highlightId:highlight.id,pdfId:meta.id,sourcePage:highlight.page||1,sourceText:highlight.text,sourceExcerpt:highlight.text,subject:meta.subject||meta.name||'Study',generated:true,tags:[],explanation:highlight.text};
+    return {flashcards:[{...source,id,type:'flashcard',question,answer}],quizQuestions:[{...source,id:`${id}_quiz`,type:'enumeration',question,correctAnswer:answer,expectedItems:items}],message:`Created 1 flashcard and 1 quiz question from ${items.length} listed items.`};
+  }
   const text = cleanText(highlight.text).replace(/:\s*\n\s*(?:[-•*]|\d+[.)])\s*/g, ': ').replace(/(?:^|\n)\s*(?:[-•*]|\d+[.)])\s+/g, ', ').replace(/:\s*,\s*/g, ': ');
   if (text.split(/\s+/).length < 3) return {flashcards:[],quizQuestions:[],message:INCOMPLETE_HIGHLIGHT};
   const result = generateStudyMaterials({pages:[{pageNum:highlight.page || 1,text}]},undefined,{id:meta.id,name:meta.name,subject:meta.subject});
   // Do not turn arbitrary title fragments into fill-in-the-blank cards.
-  const meaningful = item => /\b(?:is|are|means|refers|includes?|contains?|consists?|causes?|because|results|leads|steps|first|then|finally|whereas|unlike|compared|formula|calculated|uses?|requires?|produces?|moves?|transfers?|converts?|defines?|forwards?|can|when|if)\b|[:=]/i.test(item.sourceText);
+  const meaningful = item => /\b(?:is|are|means|refers|includes?|contains?|consists?|causes?|because|results|leads|steps|first|then|finally|whereas|unlike|compared|formula|calculated|uses?|requires?|produces?|moves?|transfers?|converts?|defines?|forwards?|can|when|if|matters?|provides?|supports?|improves?|reduces?|increases?|depends?|involves?|serves?|connects?|ensures?|enables?|allows?|prevents?|determines?)\b|[:=]/i.test(item.sourceText);
   const attach = item => ({...item,id:`${highlight.id}_${item.id}`,highlightId:highlight.id,sourceText:highlight.text,sourceExcerpt:item.sourceText,sourcePage:highlight.page || 1,pdfId:meta.id,tags:[],explanation:item.explanation || item.sourceText,type:item.type || 'flashcard'});
   const flashcards=result.flashcards.filter(meaningful).map(attach);
   const quizQuestions=result.quizQuestions.filter(meaningful).map(attach);

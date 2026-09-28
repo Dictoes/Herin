@@ -27,6 +27,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   if(rejectWrites)return json({message:'Test: write denied by RLS',code:'42501'},403);
   if(method==='POST'){
    const rows=request.postDataJSON();
+   assert.equal(new Set(rows.map(row=>row.id||row.user_id)).size,rows.length,"No duplicate conflict keys in an upsert");
    if(JSON.stringify(rows)!==JSON.stringify(databaseJson(rows)))return json({message:"unsupported Unicode escape sequence",code:"22P05"},400);
    for(const row of rows){assert.equal(row.user_id,user.id);const key=row.id?'id':'user_id';const index=tables[table].findIndex(r=>r[key]===row[key]);const saved={created_at:new Date().toISOString(),updated_at:new Date().toISOString(),...tables[table][index],...row};if(index<0)tables[table].push(saved);else tables[table][index]=saved;}
    return json(rows,201);
@@ -61,6 +62,14 @@ await page.getByRole('tab',{name:/Highlights/}).click();const regenerate=page.lo
 await page.getByRole('tab',{name:'My notes',exact:true}).click();
 await page.getByRole('button',{name:'Edit note',exact:true}).click();await page.getByLabel('Your notes for this file').fill('Cloud notes survive refresh.');await saved();
 const readerUrl=page.url();await page.reload();await page.locator('.pdf-overlay > div').first().waitFor();await page.getByText('Cloud notes survive refresh.',{exact:true}).waitFor();assert.ok(downloads>=2);
+const engineeringText='Safety, mobility, accessibility, reliability, economy, constructability, environmental effects, and long- term performance matter.';
+await page.evaluate(({userId,text})=>{const key='herin:cloud:'+userId;const cached=JSON.parse(localStorage.getItem(key));cached.base=structuredClone(cached.model);const id=cached.model.pdfs.find(p=>p.kind!=='note').id;(cached.model.highlights[id]||=[]).push({id:'engineering-list-regression',source:'text',text,start:0,end:text.length,page:6,color:'green',generationStatus:'empty'});cached.pending=true;localStorage.setItem(key,JSON.stringify(cached));},{userId:user.id,text:engineeringText});
+await page.reload();await page.getByRole('tab',{name:/Highlights/}).click();await page.locator('.highlight-item').filter({hasText:engineeringText}).getByRole('button',{name:'Generate flashcards',exact:true}).click();await saved();
+const listCard=tables.flashcards.find(c=>c.data.highlightId==='engineering-list-regression');assert.ok(listCard);assert.equal(listCard.data.sourcePage,6);
+const listQuiz=tables.quizzes.flatMap(q=>q.questions).find(q=>q.highlightId==='engineering-list-regression');assert.equal(listQuiz.expectedItems.length,8);
+await navigate('flashcards');await page.getByLabel('Search flashcards').fill('Which 8 items');await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('long-term performance'));
+await navigate('quiz');await page.getByLabel('Question type').selectOption('enumeration');await page.locator('#quiz-answer').fill(listQuiz.correctAnswer);await page.getByRole('button',{name:'Check answer',exact:true}).click();await page.getByRole('heading',{name:'Correct',exact:true}).waitFor();await saved();await page.reload();await page.getByRole('heading',{name:'Correct',exact:true}).waitFor();await page.getByLabel('Question type').selectOption('');await saved();
+await page.goto(readerUrl);await page.locator('.pdf-text-layer span').first().waitFor();
 await page.evaluate(userId=>{const key='herin:cloud:'+userId;const cached=JSON.parse(localStorage.getItem(key));cached.base=structuredClone(cached.model);const id=cached.model.pdfs.find(p=>p.kind!=='note').id;cached.model.extractedTexts[id].pages[0].text+='\u0000\uD800';cached.pending=true;localStorage.setItem(key,JSON.stringify(cached));},user.id);
 await page.reload();await page.locator('.topbar-title').waitFor();await saved();assert.ok(tables.pdfs[0].extracted_text.pages[0].text.endsWith('\uFFFD\uFFFD'));
 await navigate('flashcards');await page.getByRole('button',{name:'Tap to reveal answer'}).click();await page.getByRole('button',{name:'Good',exact:true}).click();await saved();assert.equal(tables.flashcards[0].data.rating,'Good');

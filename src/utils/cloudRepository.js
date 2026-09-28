@@ -57,7 +57,9 @@ export async function encodeRows(model,userId) {
   for(const [pdfId,items] of Object.entries(model.highlights||{})) {if(model.pdfs?.find(p=>p.id===pdfId)?.kind==='note')continue;for(const h of items) rows.highlights.push({...await base(h),pdf_id:await scopedId(pdfId),highlighted_text:h.text||'',color_code:h.color||'yellow',page_number:h.page||null,bounding_box:h.rects||[]});}
   const highlightIds=new Set(Object.values(model.highlights||{}).flat().map(h=>h.id));
   for(const c of model.study?.flashcards||[]) rows.flashcards.push({...await base(c),highlight_id:highlightIds.has(c.highlightId)?await scopedId(c.highlightId):null,question:c.question,answer:c.answer,next_review_at:c.dueAt||null});
-  const grouped={}; for(const q of model.study?.quizQuestions||[]) (grouped[q.cloudQuizId||`quiz:${q.pdfId}`] ||= []).push(q);
+  // Loaded questions carry a database UUID; new questions use the document key.
+  // Resolve both before grouping so an upsert never contains the same quiz twice.
+  const grouped={}; for(const q of model.study?.quizQuestions||[]) (grouped[await scopedId(q.cloudQuizId||`quiz:${q.pdfId}`)] ||= []).push(q);
   for(const [key,questions] of Object.entries(grouped)) rows.quizzes.push({id:await scopedId(key),user_id:userId,pdf_id:await scopedId(questions[0].pdfId),title:model.quizzesMeta?.find(r=>r.id===key)?.title||'Study questions',questions,total_questions:questions.length});
   for(const row of model.quizzesMeta||[]) if(!row.questions.length && (model.pdfs||[]).some(p=>p.id===row.pdf_id)) rows.quizzes.push(row);
   for(const a of model.assignments||[]) rows.assignments.push({...await base(a),class_id:await scopedId(a.classId),title:a.title,description:a.description||null,due_date:new Date(a.due).toISOString(),status:a.completed?'completed':'pending'});
