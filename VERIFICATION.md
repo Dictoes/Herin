@@ -3,7 +3,7 @@
 ## Performed checks
 
 - Production Vite build succeeds; the offline bundle includes 197 resources.
-- 34 automated tests cover existing study generation, React components, PDF extraction, highlights, notes, quiz sessions, flashcard reviews, schedules, assignments, reminders, offline assets, Supabase schema mapping, private paths, owner filters, write failures, and offline reconciliation.
+- 36 automated tests cover existing study generation, React components, PDF extraction, highlights, notes, quiz sessions, flashcard reviews, schedules, assignments, reminders, offline assets, Supabase schema mapping, private paths, owner filters, write failures, and offline reconciliation.
 - Chrome integration against a simulated Supabase HTTP API covers signup confirmation messaging, login and session restoration, private PDF upload, original PDF reopening after refresh, rendered highlight geometry, notes, flashcard reviews, quiz answers, classes, assignments, theme restoration, RLS failure/retry, offline retry, reminders, logout protection while unsynced, logout/relogin, second-account isolation, legacy local-note import, and 390px/1440px layouts.
 - No unexpected browser console errors or uncaught page errors in that flow. Deliberate simulated 403 responses are excluded from the console-error assertion.
 - The actual configured app renders login and signup screens with no console errors, without mocking the API.

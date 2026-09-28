@@ -1,6 +1,6 @@
 # Herin Supabase connection
 
-The app uses the provided project URL and publishable key from `.env.local`. Only the publishable key belongs in the frontend; never add a secret key, database password, or service-role key to Vite variables.
+The app uses the provided project URL and publishable key as public defaults in `src/lib/supabaseConfig.js`. Nonempty Vite environment variables override these defaults. Empty or missing Vercel variables use the defaults, so they cannot disable the deployed client. Only the publishable key belongs in the frontend; never add a secret key, database password, or service-role key to Vite variables.
 
 ## SQL setup
 
