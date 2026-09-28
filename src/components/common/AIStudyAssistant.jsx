@@ -7,6 +7,7 @@ import {cloudUser, flushCloud, refreshCloud} from '../../utils/cloudStore';
 import {databaseId} from '../../utils/cloudRepository';
 import {storage} from '../../utils/storage';
 import {processPdf} from '../../utils/processPdf';
+import {readStudyResponse} from '../../utils/aiResponse';
 
 export default function AIStudyAssistant({meta}) {
   const app=useApp(),navigate=useNavigate();
@@ -48,12 +49,7 @@ export default function AIStudyAssistant({meta}) {
       if(!current())return;
       await flushCloud();
       setStatus(retry.current.contentType==='summary'?'Generating summary':retry.current.contentType==='quiz'?'Generating quiz':retry.current.contentType==='both'?'Generating flashcards and quiz':'Generating flashcards');
-      const {data,error:invokeError}=await supabase.functions.invoke('generate-study-content',{body:retry.current});
-      if(invokeError){
-        let code;try{code=(await invokeError.context?.json())?.code;}catch{}
-        const messages={MODEL_UNAVAILABLE:'The configured Gemini model is unavailable. Ask the owner to check model access.',PROVIDER_UNAVAILABLE:'Google AI is temporarily unavailable. Wait before retrying.',UNAVAILABLE:'The AI server could not complete the request. Please report error code UNAVAILABLE.',INVALID_REQUEST:'These generation options are invalid. Start a new generation.',REQUEST_CONFLICT:'These options differ from the original request. Start a new generation.',QUOTA:'AI quota or rate limit reached. Wait before retrying.',DAILY_LIMIT:'Daily study limit reached. Try again tomorrow.',NOT_CONFIGURED:'Ask the owner to add the Gemini server secret.',PROVIDER_CONFIGURATION:'Ask the owner to check the Gemini server key and model access.',IN_PROGRESS:'This generation is still running. Wait a few minutes, then retry.',EMPTY_PDF:'This topic has no readable text. Select another topic or run OCR.',PDF_TOO_LARGE:'Select a smaller topic and retry (up to 240,000 text characters).',AUTH_REQUIRED:'Your session expired. Sign in again.',INVALID_RESPONSE:'AI returned an incomplete response. Try fewer items.',DATABASE_ERROR:'Results could not be saved. Check the AI migration, then retry.',TIMEOUT:'Generation timed out. Try a smaller topic.',NOT_FOUND:'The selected PDF, class, or topic is unavailable.'};
-        throw Error(messages[code]||'AI could not finish. Check the server setup and connection, then retry.');
-      }
+      const data=await readStudyResponse(await supabase.functions.invoke('generate-study-content',{body:retry.current}));
       if(!current())return;
       setStatus('Saving results');await refreshCloud();await loadExtras();
       if(current()){setResult(data);setStatus('Completed');sessionStorage.removeItem(`herin:ai:${owner.current}:${meta.id}`);retry.current=null;}

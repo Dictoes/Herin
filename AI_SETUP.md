@@ -15,7 +15,7 @@ Implemented in the existing PDF reader without replacing highlights, notes, loca
 
 ## Deployment
 
-The AI migration and Edge Function were deployed to project `ycejqtvemiesuiflyqmw` on 2026-09-28. The presence of `GEMINI_API_KEY` was confirmed through Supabase secret metadata; its value was not retrieved. A signed-in live generation must still verify key validity and available Gemini quota.
+The AI migration and Edge Function were deployed to project `ycejqtvemiesuiflyqmw` on 2026-09-28. The presence of `GEMINI_API_KEY` was confirmed through Supabase secret metadata; its value was not retrieved. Authenticated live generation was verified on 2026-09-29 for 3 flashcards, 3 quiz questions, and both (3 of each). See AI_DEBUG_REPORT.md.
 
 The deployment account must have access to this project. To repeat deployment:
 
@@ -80,11 +80,11 @@ For the final live test after configuring the key:
 5. Try a named page-range topic and a summary; reopen the PDF to confirm the summary remains.
 6. Try easy/hard/mixed, a longer PDF, and a scanned PDF. A scan without text should display an OCR message without calling Gemini.
 
-Live Gemini output quality and a real signed-in user's full HTTP round trip require the rotated secret and an authenticated account; mocked tests do not certify those live flows. Grounding instructions and schema checks reduce errors but cannot guarantee every AI answer is correct; the UI links results to source pages for review.
+Real signed-in generation, validation, database save, and frontend completion were verified for all three modes on 2026-09-29. Mocked tests separately cover failure cases; they do not predict future provider availability or certify every generated fact. Grounding instructions and schema checks reduce errors but cannot guarantee every AI answer is correct; the UI links results to source pages for review.
 
 ## Limits and safe failure
 
-1–30 items per requested type; the model may return fewer if the source cannot support the count. Maximum 20 new generation requests per account per rolling 24 hours. Each Gemini call has a 40-second timeout; the overall generation budget is 105 seconds. Transient 5xx errors have one retry after a one-second delay; quota/429 errors are not automatically retried. A Retry button reuses the request ID to avoid duplicate saves. Provider billing/rate limits are controlled in Google AI Studio; this implementation does not enable billing or increase a quota.
+1–30 items per requested type; the model may return fewer if the source cannot support the count. Maximum 20 new generation requests per account per rolling 24 hours. Each Gemini call has a 40-second timeout; the overall generation budget is 105 seconds. Transient 5xx errors have two retries after one-second and two-second delays; quota/429 errors are not automatically retried. A Retry button reuses the request ID to avoid duplicate saves. Provider billing/rate limits are controlled in Google AI Studio; this implementation does not enable billing or increase a quota.
 
 Missing secrets, expired sessions, invalid ownership, empty text, oversized text, invalid JSON, unavailable providers and database failures produce safe messages without private source text or credentials.
 

@@ -34,10 +34,20 @@ test('provider errors are safe, quota is not retried, transient retry is bounded
   for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'MODEL_UNAVAILABLE']]){
     let calls=0;await assert.rejects(callGemini(section,base,{key:'private-test',fetcher:async()=>{calls++;return new Response('private source text',{status});}}),e=>e.code===code&&!e.message.includes('private'));assert.equal(calls,1);
   }
-  let calls=0;await assert.rejects(callGemini(section,base,{key:'test',sleep:async()=>{},fetcher:async()=>{calls++;return new Response('',{status:503});}}),StudyError);assert.equal(calls,2);
+  let calls=0;const delays=[];await assert.rejects(callGemini(section,base,{key:'test',sleep:async ms=>delays.push(ms),fetcher:async()=>{calls++;return new Response('',{status:503});}}),e=>e.code==='PROVIDER_UNAVAILABLE'&&e.providerStatus===503);assert.equal(calls,3);assert.deepEqual(delays,[1000,2000]);
   await assert.rejects(callGemini(section,base,{key:'test',fetcher:async()=>{throw Error('key must stay hidden');}}),e=>e.code==='TIMEOUT');
   await assert.rejects(callGemini(section,base,{key:'test',fetcher:async()=>new Response('{broken')}),e=>e.code==='INVALID_RESPONSE');
-  await assert.rejects(callGemini(section,base,{key:''}),e=>e.code==='NOT_CONFIGURED');
+  await assert.rejects(callGemini(section,base,{key:''}),e=>e.code==='MISSING_API_KEY');
+});
+test('Gemini JSON fences are removed but malformed or empty output is still rejected',async()=>{
+  const make=text=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text}]}}]}));
+  const result=await callGemini(section,base,{key:'test',fetcher:async()=>make('```json\n'+JSON.stringify(output)+'\n```')});assert.equal(result.flashcards.length,1);
+  for(const text of ['```json\n{bad}\n```','```json\n{}\n```',''])await assert.rejects(callGemini(section,base,{key:'test',fetcher:async()=>make(text)}),e=>e.code==='INVALID_RESPONSE');
+});
+test('a temporary Google 503 can recover within the bounded retry budget',async()=>{
+  let calls=0;
+  const result=await callGemini(section,base,{key:'test',sleep:async()=>{},fetcher:async()=>++calls===1?new Response('',{status:503}):response(output)});
+  assert.equal(calls,2);assert.equal(result.quiz_questions.length,1);
 });
 test('multiple chunks deduplicate cards and quiz questions before saving',async()=>{
   const result=await generateSections([section,section],base,{key:'test',fetcher:async()=>response(output)});
@@ -57,6 +67,6 @@ test('handler rejects unauthenticated requests and cross-owner PDF/class/topic b
   for(const options of [{authenticated:false},{owns:false},{topicOwns:false},{classOwns:false}]){f=fixture(options);assert.ok((await f.invoke({...base,topicId:id,classId:id})).status>=400);assert.equal(f.counts().generated,0);}
 });
 test('handler surfaces safe DB failure and reuses completed request without AI or another save',async()=>{
-  const f=fixture({dbFailure:true}),r=await f.invoke();assert.equal(r.status,503);assert.equal((await r.json()).code,'DATABASE_ERROR');
-  const repeat=fixture({completed:true});assert.equal((await repeat.invoke()).status,200);assert.deepEqual(repeat.counts(),{generated:0,saved:0});
+  const f=fixture({dbFailure:true}),r=await f.invoke();assert.equal(r.status,503);const failure=await r.json();assert.equal(failure.success,false);assert.equal(failure.error.code,'DATABASE_ERROR');assert.ok(!JSON.stringify(failure).includes('private postgres'));
+  const repeat=fixture({completed:true}),ok=await repeat.invoke();assert.equal(ok.status,200);const saved=await ok.json();assert.equal(saved.success,true);assert.equal(saved.saved,true);assert.ok(Array.isArray(saved.flashcards));assert.ok(Array.isArray(saved.quiz_questions));assert.deepEqual(repeat.counts(),{generated:0,saved:0});
 });

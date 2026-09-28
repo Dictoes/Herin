@@ -11,5 +11,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 );
 
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
- window.addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(error=>window.dispatchEvent(new CustomEvent('herin-offline-error',{detail:'Offline preparation failed. Reconnect and reload.'}))));
+ window.addEventListener('load',()=>navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`,{updateViaCache:'none'}).then(registration=>{
+   if(!registration)return;
+   const check=()=>{if(navigator.onLine)registration.update().catch(()=>{});};
+   window.addEventListener('focus',check);window.addEventListener('online',check);
+   setInterval(check,60000);
+ }).catch(()=>window.dispatchEvent(new CustomEvent('herin-offline-error',{detail:'Offline preparation failed. Reconnect and reload.'}))));
 }
