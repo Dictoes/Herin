@@ -51,7 +51,7 @@ export function createHandler({createClient, env, generate = generateSections}) 
       const safe = error instanceof StudyError ? error : new StudyError('UNAVAILABLE','Study generation is unavailable. Please retry later.',503);
       if (claimed) {
         // No content or provider errors are stored/logged. A lease expires if this best-effort update fails.
-        try { await client.from('study_generations').update({status:'failed',result:{errorCode:safe.code}}).eq('id',input.requestId).eq('lease',lease).eq('status','processing'); } catch {}
+        try { await client.from('study_generations').update({status:'failed',result:{errorCode:safe.code,...(Number.isInteger(safe.providerStatus)?{providerStatus:safe.providerStatus}:{})}}).eq('id',input.requestId).eq('lease',lease).eq('status','processing'); } catch {}
       }
       return reply({code:safe.code,message:safe.message},safe.status);
     }

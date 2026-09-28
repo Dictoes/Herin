@@ -79,7 +79,11 @@ export async function callGemini(section, request, {key, model = 'gemini-3.5-fla
     if (response.status === 404) throw new StudyError('MODEL_UNAVAILABLE', 'The configured Gemini model is unavailable for this project. Check model access.', 502);
     if ([400,401,403].includes(response.status)) throw new StudyError('PROVIDER_CONFIGURATION', 'AI configuration was rejected. Ask the owner to check the server key and model access.', 502);
     if (response.status >= 500 && attempt === 0) { await sleep(1000); continue; }
-    if (!response.ok) throw new StudyError('PROVIDER_UNAVAILABLE', 'AI is temporarily unavailable. Please retry later.', 502);
+    if (!response.ok) {
+      const error=new StudyError('PROVIDER_UNAVAILABLE', 'AI is temporarily unavailable. Please retry later.', 502);
+      error.providerStatus=response.status;
+      throw error;
+    }
     try {
       const body = await response.json();
       const candidate = body.candidates?.[0];
