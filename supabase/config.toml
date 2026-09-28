@@ -1,3 +1,8 @@
+[auth]
+# Verification emails must return to the public site, including on phones.
+site_url = "https://herin-phi.vercel.app/"
+additional_redirect_urls = ["https://herin-phi.vercel.app/"]
+
 [functions.generate-study-content]
 # Authentication is explicitly verified with auth.getUser in the handler.
 # Supports both legacy JWT and new asymmetric signing keys.

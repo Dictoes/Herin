@@ -12,7 +12,9 @@ The full setup creates or retains all ten existing tables, enables owner-only RL
 
 ## Authentication setup
 
-In Supabase Authentication → URL Configuration, set the Site URL to the deployed Herin URL and add its URL and your development URL (`http://localhost:5173/` or `http://127.0.0.1:5173/`) to the allowed redirect URLs. The app sends email confirmations back to the current origin and base path.
+The production Site URL and redirect allowlist are both set to `https://herin-phi.vercel.app/` in Supabase and `supabase/config.toml`. The app sends its current origin and base path as `emailRedirectTo`; unapproved origins (including localhost) fall back to the production Site URL, so confirmation links work on phones. Do not add localhost to this production project's redirect allowlist unless device-local confirmation is explicitly intended.
+
+Apply these declared settings with `npx supabase config push --project-ref ycejqtvemiesuiflyqmw --yes`. This configuration declares only the redirect fields; it does not change confirmation, MFA, or other existing auth settings. Verified on 2026-09-29: the live verification endpoint returned a 303 to the production origin for default, production, and localhost redirect inputs, using an invalid test token without sending email or modifying an account.
 
 Email signup and confirmation are enabled on the supplied project. Create an account in Herin, follow the confirmation email, then log in. Settings contains Log out. Session restoration and token refresh use Supabase Auth.
 
