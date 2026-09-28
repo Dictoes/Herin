@@ -131,6 +131,7 @@ export function AppProvider({ children }) {
 
   const deleteClass = useCallback((id) => {
     setAssignments(prev=>prev.map(a=>a.classId===id?{...a,classId:''}:a));
+    setPdfsState(prev=>prev.map(p=>p.classId===id?{...p,classId:''}:p));
     return setClassesState((prev) => prev.filter((c) => c.id !== id));
   }, []);
 

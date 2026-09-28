@@ -62,6 +62,20 @@ export async function flushCloud() {
   try {await ctx.flight;} finally {ctx.flight=null;}
 }
 export function closeCloud() {if(active)clearTimeout(active.timer);active=null;}
+// Incorporate server-generated rows without discarding edits made while loading.
+export async function refreshCloud() {
+  await flushCloud();
+  const ctx=active;if(!ctx)throw Error('Sign in again.');
+  const base=ctx.base;
+  ctx.flight=(async()=>{
+    const remote=await ctx.repository.load();
+    if(active!==ctx)return;
+    ctx.model=mergeWorkspace(base,ctx.model,remote);ctx.base=remote;
+    persist(ctx);window.dispatchEvent(new Event('herin-cloud-refresh'));
+  })();
+  try {await ctx.flight;} finally {ctx.flight=null;}
+  if(active===ctx)await flushCloud();
+}
 export async function uploadCloudPdf(id,file) {if(!active)throw Error('Sign in to upload PDFs.');return active.repository.upload(id,file);}
 export async function downloadCloudPdf(id) {if(!active)throw Error('Sign in to open PDFs.');const p=active.model.pdfs?.find(p=>p.id===id);return active.repository.download(id,p?.filePath);}
 export async function removeCloudPdf(id) {if(!active)throw Error('Sign in to delete PDFs.');const p=active.model.pdfs?.find(p=>p.id===id);if(p?.kind==='note')return;await active.repository.remove(id,p?.filePath);}

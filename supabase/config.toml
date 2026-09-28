@@ -1,0 +1,4 @@
+[functions.generate-study-content]
+# Authentication is explicitly verified with auth.getUser in the handler.
+# Supports both legacy JWT and new asymmetric signing keys.
+verify_jwt = false

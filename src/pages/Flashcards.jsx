@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { BookOpen, Pencil, Trash2, Search, Shuffle } from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import EmptyState from '../components/common/EmptyState';
@@ -10,7 +10,8 @@ import { useApp } from '../context/AppContext';
 export default function Flashcards() {
   const { flashcards, pdfs, updateFlashcard, deleteFlashcard, pushToast } = useApp();
   const [query,setQuery] = useState('');
-  const [source,setSource] = useState('');
+  const [params] = useSearchParams();
+  const [source,setSource] = useState(params.get('pdf')||'');
   const [page,setPage] = useState(0);
   const [revealed,setRevealed] = useState({});
   const [editing,setEditing] = useState(null);

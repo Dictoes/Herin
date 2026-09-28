@@ -4,3 +4,5 @@ dist/
 .env.*.local
 test-results/
 playwright-report/
+supabase/.temp/
+supabase/.env*

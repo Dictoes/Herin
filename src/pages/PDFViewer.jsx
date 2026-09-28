@@ -19,6 +19,7 @@ import { loadPdfDocument } from '../utils/pdfUtils';
 import { generateClearNotes, generateStudyMaterials } from '../utils/flashcardUtils';
 import { processPdf } from '../utils/processPdf';
 import StudyNote from '../components/common/StudyNote';
+import AIStudyAssistant from '../components/common/AIStudyAssistant';
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -87,7 +88,6 @@ export default function PDFViewer() {
 
   useEffect(() => {
     if (meta?.kind === 'note') setTab('notes');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -156,6 +156,7 @@ export default function PDFViewer() {
       {meta.status === 'error' && <div className="import-error" role="alert"><p>{meta.error}</p><button className="btn btn-secondary" disabled={!!genStatus} onClick={regenerate}>Retry extraction</button></div>}
       {genStatus && <p role="status" className="generation-status">{genStatus}</p>}
       {meta.studyDetails && <details className="coverage-report"><summary>{meta.studySummary}</summary><p>Local, text-based study aids. Review answers against the source. Pages without selectable text need manual notes; OCR is not installed.</p><div className="coverage-pages">{meta.studyDetails.coverage?.map(p=><span className={`badge ${p.cards ? 'badge-info' : 'badge-soon'}`} key={p.page}>Page {p.page}: {p.characters} text characters</span>)}</div>{meta.studyWarnings?.map(w=><p key={w}>{w}</p>)}<Link to="/flashcards">Review flashcards</Link> / <Link to="/quiz">Practice quiz</Link></details>}
+      {meta.kind !== 'note' && <AIStudyAssistant key={id} meta={meta}/>}
       <div className={`viewer-layout ${meta.kind === 'note' ? 'standalone-layout' : ''}`}>
         {meta.kind !== 'note' && <div className="viewer-panel">
           <div className="viewer-toolbar">

@@ -139,3 +139,13 @@
 .flip-front {color:var(--ink);}
 
 body:has(.modal-backdrop) .pdf-highlight-tools {z-index:1;}
+.ai-study { margin: 18px 0; padding: 20px; }
+.ai-study h2 { display: flex; align-items: center; gap: 8px; font-size: 1.15rem; }
+.ai-controls { display: grid; grid-template-columns: repeat(auto-fit,minmax(160px,1fr)); gap: 12px; align-items: end; margin: 12px 0; }
+.ai-controls .field { min-width: 0; }
+.ai-controls .select, .ai-controls .input { width: 100%; min-width: 0; }
+.ai-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.ai-summary { white-space:pre-wrap; overflow-wrap:anywhere; }
+.ai-spinner { animation: ai-spin 1s linear infinite; vertical-align:middle; }
+@keyframes ai-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .ai-spinner { animation:none; } }

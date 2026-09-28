@@ -46,3 +46,11 @@ test('new questions merge into the loaded document quiz without duplicate upsert
  assert.deepEqual(next.quizzes[0].questions.map(q=>q.id),['q1','new-question']);
  assert.equal(decodeRows(next).study.quizQuestions.length,2);
 });
+
+test('AI cards without highlights reopen under their PDF and coexist with local cards',async()=>{
+ const rows=await encodeRows(model,user),pdfId=rows.pdfs[0].id;
+ rows.flashcards.push({id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',user_id:user,pdf_id:pdfId,question:'AI question',answer:'Answer',source_page:3,difficulty:'hard',generation_id:'cccccccc-cccc-4ccc-cccc-cccccccccccc',data:{generator:'gemini'}});
+ const loaded=decodeRows(rows);assert.equal(loaded.study.flashcards[1].pdfId,'p1');assert.equal(loaded.study.flashcards[1].sourcePage,3);
+ loaded.study.flashcards[1].rating='Good';const next=await encodeRows(loaded,user);assert.equal(next.flashcards.length,2);assert.equal(next.flashcards[1].pdf_id,pdfId);assert.equal(next.flashcards[1].highlight_id,null);
+ const merged=mergeWorkspace(model,{...model,settings:{...model.settings,theme:'forest'}},loaded);assert.equal(merged.study.flashcards.length,2);assert.equal(merged.settings.theme,'forest');
+});

@@ -4,7 +4,8 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const user={id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',email:'student@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{}};
-const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders'].map(t=>[t,[]]));
+const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','study_topics','study_generations','quiz_attempts'].map(t=>[t,[]]));
+let aiCalls=0,aiFailure=false;
 const files=new Map();let rejectWrites=false,uploads=0,downloads=0;
 const jwt=()=>{const b=value=>Buffer.from(JSON.stringify(value)).toString('base64url');return b({alg:'HS256',typ:'JWT'})+'.'+b({sub:user.id,aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})+'.test';};
 const session=()=>({access_token:jwt(),refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user});
@@ -21,16 +22,31 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  if(url.pathname==='/auth/v1/token')return json(session());
  if(url.pathname==='/auth/v1/user')return json(user);
  if(url.pathname==='/auth/v1/logout')return json({});
+ if(url.pathname==='/functions/v1/generate-study-content'){
+  aiCalls++;const body=request.postDataJSON();assert.ok(body.pdfId);assert.ok(body.requestId);assert.ok(!JSON.stringify(body).includes('key'));
+  if(aiFailure)return json({code:'QUOTA',message:'Quota reached'},429);
+  const previous=tables.study_generations.find(g=>g.id===body.requestId);if(previous)return json(previous.result);
+  const pdf=tables.pdfs.find(p=>p.id===body.pdfId);assert.ok(pdf);const generationId=body.requestId,created_at=new Date().toISOString();
+  const card={id:crypto.randomUUID(),user_id:user.id,pdf_id:pdf.id,question:'AI: What does photosynthesis use?',answer:'Light',data:{pdfId:pdf.data.id,generationId,sourcePage:1,generator:'gemini',generated:true}};
+  const quizId=crypto.randomUUID(),q={id:crypto.randomUUID(),question:'AI: Which input is used?',correctAnswer:'Light',options:['Light','Stone','Metal','Sand'],type:'multiple',explanation:'The PDF describes light as the input.',sourcePage:1,generationId};
+  const cards=['both','flashcards'].includes(body.contentType),quizzes=['both','quiz'].includes(body.contentType);
+  if(cards)tables.flashcards.push({...card,created_at});if(quizzes)tables.quizzes.push({id:quizId,user_id:user.id,pdf_id:pdf.id,questions:[q],title:'AI quiz',total_questions:1,created_at});
+  const result={generationId,flashcardCount:cards?1:0,quizCount:quizzes?1:0,summaries:body.contentType==='summary'?[{text:'Photosynthesis uses light.',pages:[1]}]:[]};
+  tables.study_generations.push({id:generationId,user_id:user.id,pdf_id:pdf.id,status:'completed',created_at,result});return json(result);
+ }
+ if(url.pathname==='/rest/v1/rpc/save_quiz_attempt'){
+  const b=request.postDataJSON();if(!tables.quiz_attempts.some(a=>a.id===b.p_id))tables.quiz_attempts.push({id:b.p_id,user_id:user.id,quiz_id:b.p_quiz,score:b.p_score,total_questions:b.p_total,created_at:new Date().toISOString()});return json(null);
+ }
  if(url.pathname.startsWith('/rest/v1/')){
   const table=url.pathname.split('/').pop();if(!tables[table])return json({message:'Unknown table'},404);
-  if(method==='GET')return json(url.searchParams.get('limit')==='0'?[]:tables[table].filter(r=>r.user_id===user.id));
+  if(method==='GET'){const rows=tables[table].filter(r=>r.user_id===user.id&&[...url.searchParams].every(([key,value])=>!value.startsWith('eq.')||String(r[key])===value.slice(3)));return json(url.searchParams.get('limit')==='0'?[]:rows);}
   if(rejectWrites)return json({message:'Test: write denied by RLS',code:'42501'},403);
   if(method==='POST'){
-   const rows=request.postDataJSON();
+   const body=request.postDataJSON(),rows=Array.isArray(body)?body:[body];
    assert.equal(new Set(rows.map(row=>row.id||row.user_id)).size,rows.length,"No duplicate conflict keys in an upsert");
    if(JSON.stringify(rows)!==JSON.stringify(databaseJson(rows)))return json({message:"unsupported Unicode escape sequence",code:"22P05"},400);
    for(const row of rows){assert.equal(row.user_id,user.id);const key=row.id?'id':'user_id';const index=tables[table].findIndex(r=>r[key]===row[key]);const saved={created_at:new Date().toISOString(),updated_at:new Date().toISOString(),...tables[table][index],...row};if(index<0)tables[table].push(saved);else tables[table][index]=saved;}
-   return json(rows,201);
+   return json(Array.isArray(body)?rows:rows[0],201);
   }
   if(method==='DELETE'){assert.equal(url.searchParams.get('user_id'),'eq.'+user.id);const ids=url.searchParams.get('id').slice(3,-1).split(',');tables[table]=tables[table].filter(r=>!ids.includes(r.id));return json([]);}
  }
@@ -43,7 +59,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  throw Error('Unhandled request: '+method+' '+url);
 });
-const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*403/.test(m.text()))errors.push(m.text());});
+const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*(403|429)/.test(m.text()))errors.push(m.text());});
 const base=process.env.HERIN_URL||'http://127.0.0.1:4173';
 const saved=()=>page.getByText('Saved to Supabase',{exact:true}).first().waitFor();
 const navigate=async route=>{await page.goto(base+'/#/'+route);await page.locator('.topbar-title').waitFor();};
@@ -53,6 +69,14 @@ await page.getByRole('button',{name:'Already have an account? Log in',exact:true
 await navigate('pdfs');await page.locator('input[type=file]').setInputFiles(path.join(__dirname,'fixtures/Biology-course.pdf'));
 await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);assert.equal(tables.pdfs[0].data.status,'ready',JSON.stringify(tables.pdfs[0].data));assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
 await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locator('.pdf-text-layer span').first().waitFor();
+const ai=page.getByRole('region',{name:'AI Study Assistant'});
+await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
+await ai.getByRole('link',{name:'Review generated flashcards'}).click();await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('Light'));
+await page.reload();await page.getByRole('button',{name:'Tap to reveal answer'}).waitFor();assert.ok(await page.getByText('AI: What does photosynthesis use?',{exact:true}).count());
+await navigate('quiz');await page.locator('.quiz-options button').filter({hasText:'Light'}).click();await page.getByText('The PDF describes light as the input.').waitFor();await page.getByRole('button',{name:'See results',exact:true}).click();await page.getByText('Quiz history',{exact:true}).waitFor();assert.equal(tables.quiz_attempts.length,1);await page.reload();await page.getByText('Quiz history',{exact:true}).waitFor();assert.equal(tables.quiz_attempts.length,1);
+await navigate('pdfs/'+tables.pdfs[0].data.id);await ai.getByRole('button',{name:'Summarize topic',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();await ai.getByText(/Saved summary/).click();await ai.getByText('Photosynthesis uses light.',{exact:true}).waitFor();
+aiFailure=true;await ai.getByRole('button',{name:'Generate Flashcards',exact:true}).click();await ai.getByText('AI quota or rate limit reached. Wait before retrying.',{exact:true}).waitFor();aiFailure=false;await ai.getByRole('button',{name:'Retry AI generation'}).click();await ai.getByText('Completed',{exact:true}).waitFor();
+for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:`test-results/ai-study-${width}.png`,fullPage:true});}
 await page.locator('.pdf-text-layer').evaluate(el=>{const span=[...el.querySelectorAll('span')].find(s=>s.textContent.includes('Photosynthesis is'));if(!span)throw Error('No definition');const range=document.createRange();range.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(range);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
 await page.getByRole('button',{name:'PDF Yellow highlight',exact:true}).click();await saved();assert.ok(tables.highlights.length);assert.ok(tables.flashcards.length);assert.ok(tables.quizzes.length);
 await page.getByRole('tab',{name:'Extracted text',exact:true}).click();

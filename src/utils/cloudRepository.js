@@ -18,7 +18,7 @@ export function decodeRows(rows) {
   const classIds = new Map(rows.classes.map(r=>[r.id,id(r)]));
   const hlIds = new Map(rows.highlights.map(r=>[r.id,id(r)]));
   model.classes = rows.classes.map(r=>{let schedule={};try{schedule=JSON.parse(r.schedule_pattern)||{};}catch{}return {days:[],startTime:'09:00',endTime:'10:00',...schedule,...r.data,id:id(r),name:r.name,instructor:r.instructor||'',color:r.data?.color||r.color_code};});
-  model.pdfs = rows.pdfs.map(r=>({...r.data,id:id(r),name:r.title,filePath:r.file_path,pageCount:r.page_count,uploadedAt:r.created_at,status:r.data?.status||'ready'}));
+  model.pdfs = rows.pdfs.map(r=>({...r.data,classId:classIds.get(r.class_id)||r.data?.classId||'',id:id(r),name:r.title,filePath:r.file_path,pageCount:r.page_count,uploadedAt:r.created_at,status:r.data?.status||'ready'}));
   for(const r of rows.pdfs) if(r.extracted_text) model.extractedTexts[id(r)]=r.extracted_text;
   for(const r of rows.notes) {
     const key=pdfIds.get(r.pdf_id)||r.data?.documentId||id(r);
@@ -30,7 +30,7 @@ export function decodeRows(rows) {
     const key=pdfIds.get(r.pdf_id)||r.pdf_id;
     (model.highlights[key] ||= []).push({source:'pdf',...r.data,id:id(r),text:r.highlighted_text,color:r.color_code,page:r.page_number,rects:Array.isArray(r.bounding_box)?r.bounding_box:r.bounding_box?.rects||[]});
   }
-  model.study.flashcards=rows.flashcards.map(r=>{const hl=rows.highlights.find(h=>h.id===r.highlight_id);return {pdfId:pdfIds.get(hl?.pdf_id),sourcePage:hl?.page_number,sourceText:hl?.highlighted_text,...r.data,id:id(r),highlightId:hlIds.get(r.highlight_id)||r.highlight_id||r.data?.highlightId,question:r.question,answer:r.answer,dueAt:r.next_review_at||r.data?.dueAt};});
+  model.study.flashcards=rows.flashcards.map(r=>{const hl=rows.highlights.find(h=>h.id===r.highlight_id);return {pdfId:pdfIds.get(r.pdf_id||hl?.pdf_id),sourcePage:r.source_page||hl?.page_number,difficulty:r.difficulty,generationId:r.generation_id,sourceText:hl?.highlighted_text,...r.data,id:id(r),highlightId:hlIds.get(r.highlight_id)||r.highlight_id||r.data?.highlightId,question:r.question,answer:r.answer,dueAt:r.next_review_at||r.data?.dueAt};});
   model.study.quizQuestions=rows.quizzes.flatMap(r=>r.questions.map(q=>({...q,cloudQuizId:r.id,pdfId:pdfIds.get(r.pdf_id)||r.pdf_id})));
   model.assignments=rows.assignments.map(r=>({...r.data,id:id(r),title:r.title,description:r.description||'',classId:classIds.get(r.class_id)||'',due:r.data?.due||r.due_date,completed:r.status==='completed'}));
   for(const r of rows.reminders) model.reminders[r.data?.key||r.id]={...r.data,id:r.id,title:r.title,remindAt:r.remind_at,completed:r.is_completed,entityType:r.related_entity_type,entityId:r.related_entity_id};
@@ -46,7 +46,7 @@ export async function encodeRows(model,userId) {
   for(const c of model.classes||[]) rows.classes.push({...await base(c),name:c.name,instructor:c.instructor||null,schedule_pattern:JSON.stringify({days:c.days,startTime:c.startTime,endTime:c.endTime}),color_code:c.color||null});
   for(const p of model.pdfs||[]) {
     if(p.kind==='note') continue;
-    rows.pdfs.push({...await base(p),title:p.name,file_path:p.filePath||await pdfPath(userId,p.id),page_count:p.pageCount||null,extracted_text:model.extractedTexts?.[p.id]||null});
+    rows.pdfs.push({...await base(p),class_id:await scopedId(p.classId),title:p.name,file_path:p.filePath||await pdfPath(userId,p.id),page_count:p.pageCount||null,extracted_text:model.extractedTexts?.[p.id]||null});
   }
   for(const p of model.pdfs||[]) {
     const n=model.notes?.[p.id]; if(!n && p.kind!=='note') continue;
@@ -56,7 +56,7 @@ export async function encodeRows(model,userId) {
   }
   for(const [pdfId,items] of Object.entries(model.highlights||{})) {if(model.pdfs?.find(p=>p.id===pdfId)?.kind==='note')continue;for(const h of items) rows.highlights.push({...await base(h),pdf_id:await scopedId(pdfId),highlighted_text:h.text||'',color_code:h.color||'yellow',page_number:h.page||null,bounding_box:h.rects||[]});}
   const highlightIds=new Set(Object.values(model.highlights||{}).flat().map(h=>h.id));
-  for(const c of model.study?.flashcards||[]) rows.flashcards.push({...await base(c),highlight_id:highlightIds.has(c.highlightId)?await scopedId(c.highlightId):null,question:c.question,answer:c.answer,next_review_at:c.dueAt||null});
+  for(const c of model.study?.flashcards||[]) rows.flashcards.push({...await base(c),...(c.generator==='gemini'?{pdf_id:await scopedId(c.pdfId),difficulty:c.difficulty,source_page:c.sourcePage||null}:{}),highlight_id:highlightIds.has(c.highlightId)?await scopedId(c.highlightId):null,question:c.question,answer:c.answer,next_review_at:c.dueAt||null});
   // Loaded questions carry a database UUID; new questions use the document key.
   // Resolve both before grouping so an upsert never contains the same quiz twice.
   const grouped={}; for(const q of model.study?.quizQuestions||[]) (grouped[await scopedId(q.cloudQuizId||`quiz:${q.pdfId}`)] ||= []).push(q);
