@@ -66,9 +66,12 @@ export default function AIStudyAssistant({meta}) {
       setTopics(p=>[...p,data]);setTopicId(data.id);setTopicForm(false);setTopicName('');
     }catch(e){setError(e.message);}
   }
-  return <section className="card ai-study" aria-label="AI Study Assistant">
-    <h2><Sparkles size={20}/> AI Study Assistant</h2>
-    <p>Generate from this PDF only. Selected text is processed by Gemini. Review answers against the source.</p>
+  return <section className="card ai-study" aria-label="AI Herin Assistant">
+    <header className="ai-heading">
+      <span className="ai-heading-icon" aria-hidden="true"><Sparkles size={24}/></span>
+      <div><h2>AI Herin Assistant</h2>
+      <p>Generate from this PDF only. Selected text is processed by Gemini. Review answers against the source.</p></div>
+    </header>
     <div className="ai-controls">
       <label className="field">Selected PDF<select className="select" value={meta.id} disabled={busy} onChange={e=>navigate(`/pdfs/${e.target.value}`)}>{app.pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
       <label className="field">Class<select className="select" value={meta.classId||''} disabled={busy} onChange={e=>app.updatePdfMeta(meta.id,{classId:e.target.value})}><option value="">No class linked</option>{app.classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
