@@ -7,3 +7,7 @@ additional_redirect_urls = ["https://herin-phi.vercel.app/"]
 # Authentication is explicitly verified with auth.getUser in the handler.
 # Supports both legacy JWT and new asymmetric signing keys.
 verify_jwt = false
+
+[functions.push-notifications]
+# User actions verify auth.getUser; the scheduler uses a separate server secret.
+verify_jwt = false

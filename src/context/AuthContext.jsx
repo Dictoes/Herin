@@ -1,12 +1,17 @@
 import React,{createContext,useContext,useEffect,useRef,useState} from 'react';
 import {supabase} from '../lib/supabase';
 import {openCloud,closeCloud,flushCloud} from '../utils/cloudStore';
+import {disableBackgroundPush,restoreBackgroundPush,clearPushOwner} from '../utils/backgroundPush';
 const AuthContext=createContext(null);
 export const useAuth=()=>useContext(AuthContext);
 export default function AuthProvider({children}) {
   const [session,setSession]=useState(null),[ready,setReady]=useState(false),[error,setError]=useState('');
   const [retry,setRetry]=useState(0);
   const version=useRef(0);
+  useEffect(()=>{
+    if(session?.user.id)restoreBackgroundPush(session.user.id).catch(()=>{});
+    else clearPushOwner().catch(()=>{});
+  },[session?.user.id]);
   useEffect(()=>{
     if(!supabase){setError('Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY, then restart Herin.');return;}
     let userId;
@@ -22,9 +27,9 @@ export default function AuthProvider({children}) {
     supabase.auth.getSession().then(({data,error})=>{if(error)setError(error.message);else if(!data.session)setReady(true);});
     return()=>{version.current++;data.subscription.unsubscribe();closeCloud();};
   },[retry]);
-  async function logout() {await flushCloud();const {error}=await supabase.auth.signOut();if(error)throw error;closeCloud();setSession(null);setReady(true);}
+  async function logout() {await flushCloud();await disableBackgroundPush();const {error}=await supabase.auth.signOut();if(error)throw error;closeCloud();setSession(null);setReady(true);}
   return <AuthContext.Provider value={{session,logout}}>
-    {error?<main className="auth-shell"><section className="card auth-card"><h1>Workspace unavailable</h1><p role="alert">{error}</p><p>Check your connection and ensure the Herin database migration has been applied.</p><button className="btn btn-primary" onClick={()=>setRetry(n=>n+1)}>Retry</button>{session&&<button className="btn btn-secondary" onClick={()=>supabase.auth.signOut().then(({error})=>{if(error)setError(error.message);else{setError('');setSession(null);setReady(true);}})}>Log out</button>}</section></main>:!ready?<main className="auth-shell" role="status">Loading your workspace…</main>:session?<React.Fragment key={session.user.id}>{children}</React.Fragment>:<AuthForm/>}
+    {error?<main className="auth-shell"><section className="card auth-card"><h1>Workspace unavailable</h1><p role="alert">{error}</p><p>Check your connection and ensure the Herin database migration has been applied.</p><button className="btn btn-primary" onClick={()=>setRetry(n=>n+1)}>Retry</button>{session&&<button className="btn btn-secondary" onClick={()=>logout().then(()=>setError('')).catch(e=>setError(e.message))}>Log out</button>}</section></main>:!ready?<main className="auth-shell" role="status">Loading your workspace…</main>:session?<React.Fragment key={session.user.id}>{children}</React.Fragment>:<AuthForm/>}
   </AuthContext.Provider>;
 }
 function AuthForm(){

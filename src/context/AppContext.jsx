@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { storage, uid } from '../utils/storage';
 import { savePdfBlob, getPdfBlob, deletePdfBlob } from '../utils/db';
 import { sendBrowserNotification } from '../utils/notifications';
+import {backgroundPushActive} from '../utils/backgroundPush';
 import { classesForDay, toMinutes } from '../utils/scheduleUtils';
 import {generateHighlightMaterials} from '../utils/flashcardUtils';
 import usePersistedState from '../utils/usePersistedState';
@@ -94,9 +95,11 @@ export function AppProvider({ children }) {
   useEffect(() => {
     if (!settings.notificationsEnabled) return;
     for(const [key,reminder] of Object.entries(storage.getReminders())) {
-      if(reminder.completed || new Date(reminder.remindAt).getTime()>now.getTime() || notifiedRef.current.has(key))continue;
+      if(backgroundPushActive())continue;
+      if(reminder.completed || reminder.localNotifiedAt || new Date(reminder.remindAt).getTime()>now.getTime() || notifiedRef.current.has(key))continue;
       notifiedRef.current.add(key);
-      storage.setReminders({...storage.getReminders(),[key]:{...reminder,completed:true}});
+      // A foreground alert is not task completion; other opted-in devices still need push.
+      storage.setReminders({...storage.getReminders(),[key]:{...reminder,localNotifiedAt:now.toISOString()}});
       pushToast(reminder.title,'info');sendBrowserNotification(reminder.title,{tag:key});
     }
     for (let offset = 0; offset <= 1; offset++) {
@@ -113,7 +116,7 @@ export function AppProvider({ children }) {
           storage.setReminders({...storage.getReminders(),[key]:{title:cls.name,remindAt:start.toISOString(),completed:true,entityId:cls.id,entityType:'class'}});
           const msg = `${cls.name} starts in ${Math.ceil(diff)} min${cls.location ? ' · ' + cls.location : ''}`;
           pushToast(msg, 'info');
-          sendBrowserNotification(`Upcoming class: ${cls.name}`, {body:msg,tag:key});
+          if(!backgroundPushActive())sendBrowserNotification(`Upcoming class: ${cls.name}`, {body:msg,tag:key});
         }
       });
     }

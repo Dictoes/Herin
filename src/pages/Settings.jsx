@@ -7,7 +7,10 @@ import AppLayout from '../components/Layout/AppLayout';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useApp } from '../context/AppContext';
 import { storage } from '../utils/storage';
-import { notificationsSupported, currentPermission, requestPermission } from '../utils/notifications';
+import { notificationsSupported, currentPermission } from '../utils/notifications';
+
+import {enableBackgroundPush,disableBackgroundPush,restoreBackgroundPush,backgroundPushSupported,testBackgroundPush} from '../utils/backgroundPush';
+import {flushCloud} from '../utils/cloudStore';
 
 export default function Settings() {
   const auth = useAuth();
@@ -16,34 +19,23 @@ export default function Settings() {
   const { settings, updateSettings, pushToast, clearAllData } = useApp();
   const [permission, setPermission] = useState(currentPermission());
   const [confirmClear, setConfirmClear] = useState(false);
+  const [pushEnabled,setPushEnabled]=useState(false),[pushBusy,setPushBusy]=useState(false),[pushError,setPushError]=useState('');
+  useEffect(()=>{restoreBackgroundPush(auth?.session?.user.id).then(setPushEnabled).catch(()=>{});},[auth?.session?.user.id]);
 
   useEffect(() => {
     setPermission(currentPermission());
   }, [settings.notificationsEnabled]);
 
-  async function handleToggleNotifications(checked) {
-    if (!checked) {
-      updateSettings({ notificationsEnabled: false });
-      return;
-    }
-    if (!notificationsSupported()) {
-      updateSettings({ notificationsEnabled: true, permissionAsked: true });
-      pushToast('Background notifications require a notification server. In-app reminders work while Herin is open.', 'info');
-      return;
-    }
-    if (Notification.permission === 'granted') {
-      updateSettings({ notificationsEnabled: true });
-      pushToast('Background notifications require a notification server. In-app reminders work while Herin is open.', 'info');
-      return;
-    }
-    const result = await requestPermission();
-    setPermission(result);
-    updateSettings({ notificationsEnabled: true, permissionAsked: true });
-    if (result === 'granted') {
-      pushToast('Background notifications require a notification server. In-app reminders work while Herin is open.', 'info');
-    } else {
-      pushToast('Browser notifications were declined  you’ll still see in-app reminders.', 'info');
-    }
+  function handleToggleNotifications(checked) {
+    updateSettings({notificationsEnabled:checked});
+  }
+  async function toggleBackground() {
+    setPushBusy(true);setPushError('');
+    try {
+      if(pushEnabled){await disableBackgroundPush();setPushEnabled(false);}
+      else {await enableBackgroundPush(auth.session.user.id);updateSettings({notificationsEnabled:true,permissionAsked:true});await flushCloud();setPushEnabled(true);}
+      setPermission(currentPermission());
+    }catch(e){setPushError(e.message);}finally{setPushBusy(false);}
   }
 
   function handleExport() {
@@ -62,7 +54,7 @@ export default function Settings() {
     <AppLayout title="Settings" subtitle="Manage reminders and your data">
       {auth && <div className="card settings-section"><h2>Account</h2><div className="settings-row"><span>{auth.session?.user.email}</span><button className="btn btn-secondary" disabled={loggingOut} onClick={async()=>{setLoggingOut(true);try{await auth.logout();}catch(e){pushToast(e.message,'error');}finally{setLoggingOut(false);}}}>{loggingOut?'Saving and logging out...':'Log out'}</button></div></div>}
       {auth && hasLegacyData() && <div className="card settings-section"><h2>Existing data on this device</h2><p>Copy your previous local Herin workspace into this account. Your original local copy will be kept.</p><button className="btn btn-secondary" disabled={importing} onClick={async()=>{setImporting(true);try{await importLegacyData();window.location.reload();}catch(e){pushToast(e.message,'error');setImporting(false);}}}>{importing?'Importing…':'Import local workspace'}</button></div>}
-      <div className="card settings-section"><h2>Install & offline access</h2><OfflineStatus details/><p>Background notifications require push notification setup. In-app reminders work while Herin is open.</p></div>
+      <div className="card settings-section"><h2>Install & offline access</h2><OfflineStatus details/><p>Enable background reminders below to receive alerts after closing Herin. On iPhone or iPad (iOS 16.4+), add Herin to your Home Screen, open it there, and allow notifications.</p></div>
       <div className="card settings-section">
         <div className="section-title">Appearance & profile</div>
         <div className="settings-row"><div><div className="label">Display name</div><div className="desc">Personalize your account across devices.</div></div><input className="input" aria-label="Display name" style={{maxWidth:220}} value={settings.displayName || ''} onChange={e => updateSettings({displayName:e.target.value})} /></div>
@@ -78,7 +70,7 @@ export default function Settings() {
           <div>
             <div className="label">Remind me before class</div>
             <div className="desc">
-              Get an in-app alert{notificationsSupported() ? ' and a browser notification' : ''} before each class starts. Keep Herin open to receive reminders; closed-browser delivery is not supported. Times follow your device time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.
+              Enable class and saved reminders for your account. For alerts while Herin is closed, also enable background reminders on each device. Times follow your device time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.
             </div>
           </div>
           <label className="switch">
@@ -110,6 +102,13 @@ export default function Settings() {
           </select>
         </div>
 
+        <div className="settings-row">
+          <div><div className="label">Background reminders on this device</div><div className="desc">{pushEnabled?'This device is registered. Delivery requires account reminders to be on, an internet connection, and notifications allowed by your device.':'Receive reminders with the Herin tab closed. Your browser or operating system may delay delivery; force-quitting or disabling background activity can stop it.'}</div></div>
+          <button className="btn btn-secondary" disabled={pushBusy||!backgroundPushSupported()} onClick={toggleBackground}>{pushBusy?'Updating...':pushEnabled?'Disable on this device':'Enable background reminders'}</button>
+        </div>
+        {!backgroundPushSupported()&&<p>On iPhone or iPad, open Herin from your Home Screen. Otherwise, use a browser that supports push notifications.</p>}
+        {pushError&&<p role="alert">{pushError}</p>}
+        {pushEnabled&&<button className="btn btn-secondary" disabled={pushBusy} onClick={async()=>{setPushBusy(true);setPushError('');try{await testBackgroundPush();pushToast('Test sent. Check your device notifications.','success');}catch(e){setPushError(e.message);}finally{setPushBusy(false);}}}>Send test notification</button>}
         {notificationsSupported() && (
           <div className="settings-row">
             <div>
@@ -117,7 +116,7 @@ export default function Settings() {
               <div className="desc">
                 {permission === 'granted' && 'Browser notifications are allowed.'}
                 {permission === 'denied' && 'Browser notifications are blocked. Enable them in your browser\u2019s site settings to receive pop-up alerts; in-app reminders will still work.'}
-                {permission === 'default' && 'You\u2019ll be asked to allow notifications when you turn reminders on.'}
+                {permission === 'default' && 'You will be asked to allow notifications when you enable background reminders.'}
               </div>
             </div>
             <span className={`badge ${permission === 'granted' ? 'badge-live' : permission === 'denied' ? 'badge-danger' : 'badge-info'}`}>
