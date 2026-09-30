@@ -1,0 +1,7 @@
+.support-trigger{gap:8px;margin:12px 0 4px;white-space:normal;text-align:left}
+.sidebar-foot .support-trigger{width:100%;justify-content:center}
+.support-content{text-align:center}
+.support-intro{color:var(--ink-soft);line-height:1.65;margin:0 0 18px}
+.support-qr{display:block;width:100%;max-width:400px;height:auto;margin:0 auto;border-radius:12px;background:#fff}
+.support-instructions{font-size:13px;line-height:1.7;color:var(--ink-soft);margin:18px 0 10px}
+.support-note{font-size:12px;line-height:1.6;color:var(--ink-faint);margin:0}

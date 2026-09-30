@@ -1,3 +1,4 @@
+import SupportHerin from '../common/SupportHerin';
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {useApp} from '../../context/AppContext';
@@ -44,7 +45,7 @@ export default function Sidebar({ open, onNavigate }) {
             </NavLink>
           </React.Fragment>)}
         </div>
-        <div className="sidebar-foot">Your private study workspace.<div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a></div></div>
+        <div className="sidebar-foot"><SupportHerin/>Your private study workspace.<div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a></div></div>
       </nav>
     </>
   );
