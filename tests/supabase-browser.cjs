@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const user={id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',email:'student@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{}};
-const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','study_topics','study_generations','quiz_attempts','push_subscriptions'].map(t=>[t,[]]));
+const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','study_topics','study_generations','quiz_attempts','push_subscriptions','shared_study_links'].map(t=>[t,[]]));
 const pushTest=process.env.HERIN_PUSH_TEST==='1';
 const design=process.env.HERIN_DESIGN_TEST==='1'?require('./design-audit.cjs').capture:async()=>{};
 let aiCalls=0,aiFailure=false;
@@ -49,7 +49,13 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   const result={generationId,flashcardCount:cards?1:0,quizCount:quizzes?1:0,summaries:body.contentType==='summary'?[{text:'Photosynthesis uses light.',pages:[1]}]:[]};
   tables.study_generations.push({id:generationId,user_id:user.id,pdf_id:pdf.id,status:'completed',created_at,result});return json(result);
  }
+ if(url.pathname==='/rest/v1/rpc/create_study_share'){
+  const b=request.postDataJSON();assert.ok(['pdf','note','quiz','flashcard'].includes(b.p_kind));assert.deepEqual(Object.keys(b.p_snapshot).sort(),['flashcards','quizzes','text']);
+  if(!tables.shared_study_links.some(s=>s.share_id===b.p_share_id))tables.shared_study_links.push({share_id:b.p_share_id,user_id:user.id,title:b.p_title,subject:b.p_subject,content_snapshot:structuredClone(b.p_snapshot),created_at:new Date().toISOString(),is_public:true});return json(b.p_share_id);
+ }
+ if(url.pathname==='/rest/v1/rpc/revoke_study_share'){const b=request.postDataJSON();tables.shared_study_links.find(s=>s.share_id===b.p_share_id&&s.user_id===user.id).is_public=false;return json(null);}
  if(url.pathname==='/rest/v1/rpc/save_quiz_attempt'){
+
   const b=request.postDataJSON();if(!tables.quiz_attempts.some(a=>a.id===b.p_id))tables.quiz_attempts.push({id:b.p_id,user_id:user.id,quiz_id:b.p_quiz,score:b.p_score,total_questions:b.p_total,created_at:new Date().toISOString()});return json(null);
  }
  if(url.pathname.startsWith('/rest/v1/')){
@@ -121,6 +127,7 @@ await page.evaluate(userId=>{const key='herin:cloud:'+userId;const cached=JSON.p
 await page.reload();await page.locator('.topbar-title').waitFor();await saved();assert.ok(tables.pdfs[0].extracted_text.pages[0].text.endsWith('\uFFFD\uFFFD'));
 await navigate('flashcards');await page.getByRole('button',{name:'Tap to reveal answer'}).click();await page.getByRole('button',{name:'Good',exact:true}).click();await saved();assert.equal(tables.flashcards[0].data.rating,'Good');
 await navigate('quiz');const answer=page.locator('#quiz-answer');if(await answer.count()){await answer.fill('wrong answer');await page.getByRole('button',{name:'Check answer',exact:true}).click();}else await page.locator('.quiz-options button').first().click();await saved();assert.ok(tables.user_preferences[0].data.quizSession.status);
+await require('./share-flow.cjs').run({browser,context,page,tables,base,readerUrl,navigate,saved});
 await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await page.getByLabel('Class name',{exact:true}).fill('Cloud Biology');await page.getByRole('dialog').getByRole('button',{name:'Mon',exact:true}).click();await page.getByLabel('Start time').fill('10:00');await page.getByLabel('End time').fill('11:00');await page.getByRole('dialog').getByRole('button',{name:'Add class',exact:true}).click();await saved();assert.equal(tables.classes[0].name,'Cloud Biology');
 await page.getByRole('button',{name:'Add deadline',exact:true}).click();await page.getByLabel('Assignment',{exact:true}).fill('Cloud homework');await page.getByLabel('Due date and time').fill('2026-10-01T12:00');await page.getByRole('button',{name:'Save deadline',exact:true}).click();await saved();assert.equal(tables.assignments[0].title,'Cloud homework');
 await navigate('settings');await page.getByRole('button',{name:'Plum',exact:true}).click();await page.getByLabel('Color mode').selectOption('dark');await saved();await page.reload();await page.getByLabel('Color mode').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'plum');assert.equal(await page.locator('html').getAttribute('data-mode'),'dark');

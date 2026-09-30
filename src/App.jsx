@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import SharedStudy from './pages/SharedStudy';
 import InfoPage from './pages/InfoPage';
 import AuthProvider from './context/AuthContext';
 import { HashRouter, Routes, Route } from 'react-router-dom';
@@ -29,5 +30,5 @@ function Workspace() {
 }
 
 export default function App() {
-  return <HashRouter><Routes><Route path="/guide" element={<InfoPage />} /><Route path="/privacy" element={<InfoPage privacy />} /><Route path="*" element={<Workspace />} /></Routes></HashRouter>;
+  return <HashRouter><Routes><Route path="/share/:shareId" element={<SharedStudy />} /><Route path="/guide" element={<InfoPage />} /><Route path="/privacy" element={<InfoPage privacy />} /><Route path="*" element={<Workspace />} /></Routes></HashRouter>;
 }

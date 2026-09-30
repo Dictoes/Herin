@@ -91,4 +91,4 @@ test('15-minute reminder records the occurrence and does not repeat after remoun
  stop=await mount(root);assert.ok(!app().toasts.some(t=>t.message.includes('starts in 15 min')));await stop();
  storage.setSettings({...storage.getSettings(),notificationsEnabled:false});
 });
-test.after(async()=>{dom.window.close();await unlink(bundle);});
+test.after(async()=>{dom.window.close();await unlink(bundle);await unlink(new URL('./.integration-runtime.css',import.meta.url)).catch(()=>{});});

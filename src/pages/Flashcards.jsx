@@ -1,3 +1,4 @@
+import ShareStudyButton from '../components/common/ShareStudyButton';
 import React, { useState, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { BookOpen, Pencil, Trash2, Search, Shuffle } from 'lucide-react';
@@ -63,7 +64,7 @@ export default function Flashcards() {
           </div>
         </div>
         
-        <details className="study-source"><summary>Highlighted source</summary><p>{c.sourceText}</p></details><div className="study-card-footer">{c.pdfId && <Link to={`/pdfs/${c.pdfId}?page=${c.sourcePage||1}`}>Open source</Link>}<div><button className="btn btn-ghost btn-icon" aria-label="Edit flashcard" title="Edit flashcard" onClick={()=>setEditing({...c})}><Pencil size={16}/></button><button className="btn btn-ghost btn-icon" aria-label="Delete flashcard" title="Delete flashcard" onClick={()=>setDeleting(c)}><Trash2 size={16}/></button></div></div>
+        <details className="study-source"><summary>Highlighted source</summary><p>{c.sourceText}</p></details><div className="study-card-footer"><ShareStudyButton source={{kind:'flashcard',id:c.id}} title={pdfs.find(p=>p.id===c.pdfId)?.name||'Flashcard'} subject={c.subject||pdfs.find(p=>p.id===c.pdfId)?.subject||''} flashcards={[c]}/>{c.pdfId && <Link to={`/pdfs/${c.pdfId}?page=${c.sourcePage||1}`}>Open source</Link>}<div><button className="btn btn-ghost btn-icon" aria-label="Edit flashcard" title="Edit flashcard" onClick={()=>setEditing({...c})}><Pencil size={16}/></button><button className="btn btn-ghost btn-icon" aria-label="Delete flashcard" title="Delete flashcard" onClick={()=>setDeleting(c)}><Trash2 size={16}/></button></div></div>
       </section>)}</div>
       {displayList.length>1 && <div className="pagination"><button className="btn btn-secondary" disabled={!currentPage} onClick={()=>setPage(currentPage-1)}>Previous</button><span>Card {currentPage+1} of {displayList.length}</span><button className="btn btn-secondary" disabled={currentPage+1>=displayList.length} onClick={()=>setPage(currentPage+1)}>Next</button></div>}
     </>}

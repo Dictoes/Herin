@@ -1,3 +1,4 @@
+import ShareStudyButton from '../components/common/ShareStudyButton';
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import {
@@ -140,7 +141,7 @@ export default function PDFViewer() {
       subtitle={meta.pageCount ? `${meta.pageCount} page${meta.pageCount === 1 ? '' : 's'}` : undefined}
       actions={
         <>
-          <button className="btn btn-secondary" onClick={() => navigate('/pdfs')}>
+          <ShareStudyButton source={{kind:meta.kind==='note'?'note':'pdf',id:meta.kind==='note'?(note.rowId||'note:'+id):id}} title={meta.name} subject={meta.subject||app.classes.find(c=>c.id===meta.classId)?.name||''} content={tab==='text'?(typeof extractedText==='string'?extractedText:extractedText?.text||''):tab==='highlights'?getHighlights(id).map(h=>h.text).join('\n\n'):note.content||''} contentChoices={[{label:'My notes',value:note.content||''},{label:'Extracted lesson text',value:typeof extractedText==='string'?extractedText:extractedText?.text||''},{label:'Highlighted text',value:getHighlights(id).map(h=>h.text).join('\n\n')},{label:'No study text',value:''}]} flashcards={app.flashcards.filter(c=>c.pdfId===id)} quizzes={app.quizQuestions.filter(q=>q.pdfId===id)}/><button className="btn btn-secondary" onClick={() => navigate('/pdfs')}>
             <ArrowLeft size={15} /> Back
           </button>
           <button className="btn btn-ghost btn-icon" aria-label="Delete file" onClick={() => setConfirmDelete(true)}>
