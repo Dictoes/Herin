@@ -22,6 +22,7 @@ import { generateClearNotes, generateStudyMaterials } from '../utils/flashcardUt
 import { processPdf } from '../utils/processPdf';
 import StudyNote from '../components/common/StudyNote';
 import AIStudyAssistant from '../components/common/AIStudyAssistant';
+import AutosavingNoteEditor from '../components/common/AutosavingNoteEditor';
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -257,18 +258,14 @@ export default function PDFViewer() {
               <>
                 <div className="note-actions"><button className="btn btn-secondary btn-sm" aria-pressed={editingNote} onClick={()=>setEditingNote(!editingNote)}>{editingNote ? 'Read note' : 'Edit note'}</button>{meta.kind !== 'note' && <button className="btn btn-secondary btn-sm" disabled={!extractedText || !!genStatus} onClick={()=>setConfirmStructure(true)}>Create clearer outline</button>}</div>
                 <div className="note-actions"><button className="btn btn-secondary btn-sm" disabled={!note.content} onClick={()=>{const url=URL.createObjectURL(new Blob([note.content],{type:'text/plain'}));const a=document.createElement('a');a.href=url;a.download=meta.name.replace(/\.pdf$/i,'')+'.txt';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}}>Export note</button><button className="btn btn-ghost btn-sm" disabled={!note.content} onClick={()=>setConfirmClearNote(true)}>Clear note</button></div>
-                {editingNote || !note.content ? <textarea
-                  className="textarea"
-                  rows={16}
-                  value={note.content}
-                  onChange={(e) => setNoteContent(id, e.target.value)}
-
+                {editingNote || !note.content ? <AutosavingNoteEditor
+                  key={`note-${id}`}
+                  initialContent={note.content}
+                  updatedAt={note.updatedAt}
+                  onSave={(val) => setNoteContent(id, val)}
                   placeholder="Write your own notes about this file here. They're saved automatically."
-                  aria-label="Your notes for this file"
+                  ariaLabel="Your notes for this file"
                 /> : <StudyNote content={note.content} />}
-                <p className="field-hint" style={{ marginTop: 8 }}>
-                  {note.updatedAt ? `Saved ${timeAgo(note.updatedAt)}` : 'Start writing  changes save as you type.'}
-                </p>
               </>
             )}
 
