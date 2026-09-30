@@ -6,6 +6,7 @@ const path=require('node:path');
 const user={id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',email:'student@example.test',aud:'authenticated',role:'authenticated',app_metadata:{provider:'email'},user_metadata:{}};
 const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','study_topics','study_generations','quiz_attempts','push_subscriptions'].map(t=>[t,[]]));
 const pushTest=process.env.HERIN_PUSH_TEST==='1';
+const design=process.env.HERIN_DESIGN_TEST==='1'?require('./design-audit.cjs').capture:async()=>{};
 let aiCalls=0,aiFailure=false;
 const files=new Map();let rejectWrites=false,uploads=0,downloads=0;
 const jwt=()=>{const b=value=>Buffer.from(JSON.stringify(value)).toString('base64url');return b({alg:'HS256',typ:'JWT'})+'.'+b({sub:user.id,aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})+'.test';};
@@ -81,13 +82,17 @@ const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.acc
 const base=process.env.HERIN_URL||'http://127.0.0.1:4173';
 const saved=()=>page.getByText('Saved to Supabase',{exact:true}).first().waitFor();
 const navigate=async route=>{await page.goto(base+'/#/'+route);await page.locator('.topbar-title').waitFor();};
-await page.goto(base);await page.getByRole('button',{name:'Create an account',exact:true}).click();
+await page.goto(base);await design(page,'login');await page.getByRole('button',{name:'Create an account',exact:true}).click();await design(page,'signup');
 await page.getByLabel('Email',{exact:true}).fill(user.email);await page.getByLabel('Password',{exact:true}).fill('test-password-123');await page.getByRole('button',{name:'Sign up',exact:true}).click();await page.getByText('Check your email to confirm your account, then log in.').waitFor();
 await page.getByRole('button',{name:'Already have an account? Log in',exact:true}).click();await page.getByRole('button',{name:'Log in',exact:true}).click();await page.locator('.topbar-title').waitFor();
+if(process.env.HERIN_DESIGN_TEST==='1'){
+ for(const route of ['','schedule','pdfs','notes','flashcards','quiz']){await navigate(route);await design(page,'empty-'+(route||'dashboard'));}
+}
 await navigate('pdfs');await page.locator('input[type=file]').setInputFiles(path.join(__dirname,'fixtures/Biology-course.pdf'));
 await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);assert.equal(tables.pdfs[0].data.status,'ready',JSON.stringify(tables.pdfs[0].data));assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
 await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locator('.pdf-text-layer span').first().waitFor();
 const ai=page.getByRole('region',{name:'AI Herin Assistant'});
+await page.getByRole('button',{name:'AI Herin Assistant',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement.id),'ai-herin-assistant');
 await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
 await ai.getByRole('link',{name:'Review generated flashcards'}).click();await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('Light'));
 await page.reload();await page.getByRole('button',{name:'Tap to reveal answer'}).waitFor();assert.ok(await page.getByText('AI: What does photosynthesis use?',{exact:true}).count());
@@ -119,6 +124,16 @@ await navigate('quiz');const answer=page.locator('#quiz-answer');if(await answer
 await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await page.getByLabel('Class name',{exact:true}).fill('Cloud Biology');await page.getByRole('dialog').getByRole('button',{name:'Mon',exact:true}).click();await page.getByLabel('Start time').fill('10:00');await page.getByLabel('End time').fill('11:00');await page.getByRole('dialog').getByRole('button',{name:'Add class',exact:true}).click();await saved();assert.equal(tables.classes[0].name,'Cloud Biology');
 await page.getByRole('button',{name:'Add deadline',exact:true}).click();await page.getByLabel('Assignment',{exact:true}).fill('Cloud homework');await page.getByLabel('Due date and time').fill('2026-10-01T12:00');await page.getByRole('button',{name:'Save deadline',exact:true}).click();await saved();assert.equal(tables.assignments[0].title,'Cloud homework');
 await navigate('settings');await page.getByRole('button',{name:'Plum',exact:true}).click();await page.getByLabel('Color mode').selectOption('dark');await saved();await page.reload();await page.getByLabel('Color mode').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'plum');assert.equal(await page.locator('html').getAttribute('data-mode'),'dark');
+if(process.env.HERIN_DESIGN_TEST==='1'){
+ tables.pdfs[0].data.subject='Biology';
+ await page.reload();await page.locator('.topbar-title').waitFor();
+ for(const route of ['','schedule','pdfs','notes','flashcards','quiz','settings','pdfs/'+tables.pdfs[0].data.id]){await navigate(route);await design(page,'populated-'+(route.replace('/','-')||'dashboard'));}
+ await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await design(page,'class-form');await page.getByRole('button',{name:'Close dialog'}).click();
+ await navigate('flashcards');await page.getByRole('button',{name:'Edit flashcard',exact:true}).click();await design(page,'flashcard-form');await page.getByRole('button',{name:'Close dialog'}).click();
+ await page.getByRole('button',{name:'Delete flashcard',exact:true}).click();await design(page,'confirm-delete');await page.getByRole('button',{name:'Cancel',exact:true}).click();
+ await page.setViewportSize({width:360,height:900});await page.getByRole('button',{name:'Open navigation menu'}).click();await page.locator('.nav-subject summary').first().click();await page.screenshot({path:'test-results/design/navigation-mobile.png',animations:'disabled'});await page.getByRole('button',{name:'Close navigation menu'}).click();
+ await navigate('settings');
+}
 rejectWrites=true;await page.getByLabel('Display name').fill('Retry student');await page.getByText(/Not synced: Test: write denied by RLS/).first().waitFor();await page.reload();await page.locator('.topbar-title').waitFor();await page.getByText(/Not synced: Test: write denied by RLS/).first().waitFor();rejectWrites=false;await page.getByRole('button',{name:'Retry sync',exact:true}).first().click();await saved();assert.equal(tables.profiles[0].display_name,'Retry student');
 await context.setOffline(true);await page.getByRole('button',{name:'Forest',exact:true}).click();await page.getByText(/Not synced: Offline/).first().waitFor();await page.getByRole('button',{name:'Log out',exact:true}).click();assert.ok(await page.locator('.sidebar').count());await context.setOffline(false);await saved();assert.equal(tables.user_preferences[0].data.settings.theme,'forest');
 tables.reminders.push({id:'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb',user_id:user.id,title:'Cloud reminder',remind_at:new Date(Date.now()-1000).toISOString(),is_completed:false,related_entity_type:'custom',data:{}});tables.user_preferences[0].push_notifications=true;

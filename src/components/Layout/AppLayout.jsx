@@ -18,11 +18,13 @@ export default function AppLayout({ title, subtitle, actions, children }) {
       <div className={`sidebar-scrim ${navOpen ? 'show' : ''}`} onClick={() => setNavOpen(false)} />
       <div className="main-area">
         <header className="topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="topbar-heading">
             <img className="mobile-brand" src={`${import.meta.env.BASE_URL}herin-logo.svg`} width="30" height="30" alt="Herin" />
             <button
               className="btn btn-ghost btn-icon menu-btn"
               aria-label="Open navigation menu"
+              aria-expanded={navOpen}
+              aria-controls="main-navigation"
               onClick={() => setNavOpen(true)}
             >
               <Menu size={20} />

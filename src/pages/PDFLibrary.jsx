@@ -185,7 +185,7 @@ export default function PDFLibrary() {
                     {p.subject && <span className="subject-label">{p.subject}</span>}
                     {p.status === 'processing' && <progress aria-label="PDF processing progress" value={p.progress || 0} max="100" />}
                     {p.stage && <p className="field-hint" role="status">{p.stage}</p>}
-                    {p.studyDetails && <p className="field-hint">{p.studyDetails.pagesRead} pages processed / {p.studyDetails.flashcardsGenerated} cards</p>}
+                    {p.studyDetails && <p className="field-hint">{p.studyDetails.pagesRead} pages processed{Number.isInteger(p.studyDetails.flashcardsGenerated)?` / ${p.studyDetails.flashcardsGenerated} cards`:''}</p>}
                     {p.error && <p className="field-error">{p.error}</p>}
                   </div>
                 );

@@ -218,6 +218,7 @@ export default function Schedule() {
         />
       ) : (
         <>
+          <div className="mobile-week" aria-label="Weekly class agenda">{DAYS.map((day,index)=><section className="agenda-day" key={day}><h2>{day}{index===now.getDay()&&<span className="badge badge-info">Today</span>}</h2>{classes.filter(cls=>cls.days.includes(index)).sort((a,b)=>toMinutes(a.startTime)-toMinutes(b.startTime)).map(cls=><button key={cls.id} className="agenda-class" onClick={()=>{setEditing(cls);setFormOpen(true);}}><span className="agenda-time">{formatTime(cls.startTime)}<span>{formatTime(cls.endTime)}</span></span><span><strong>{cls.name}</strong>{cls.location&&<small>{cls.location}</small>}</span><Pencil size={16} aria-hidden="true"/></button>)}{!classes.some(cls=>cls.days.includes(index))&&<p>No classes</p>}</section>)}</div>
           <div className="week-scroll"><div className="week-grid" role="table" aria-label="Weekly class schedule" style={{ marginBottom: 'var(--space-6)' }}>
             <div className="week-head-cell corner" />
             {DAY_SHORT.map((d, i) => (

@@ -66,7 +66,7 @@ export default function AIStudyAssistant({meta}) {
       setTopics(p=>[...p,data]);setTopicId(data.id);setTopicForm(false);setTopicName('');
     }catch(e){setError(e.message);}
   }
-  return <section className="card ai-study" aria-label="AI Herin Assistant">
+  return <section id="ai-herin-assistant" tabIndex={-1} className="card ai-study" aria-label="AI Herin Assistant">
     <header className="ai-heading">
       <span className="ai-heading-icon" aria-hidden="true"><Sparkles size={24}/></span>
       <div><h2>AI Herin Assistant</h2>

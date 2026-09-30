@@ -41,7 +41,7 @@ export default function Notes() {
         <EmptyState
           icon={NotebookPen}
           title="No notes yet"
-          description="Notes are created from your uploaded PDFs. Upload a file first, then open it to start writing and highlighting."
+          description="Start a new note, or open a PDF to collect your ideas and highlights."
           action={
             <Link to="/pdfs" className="btn btn-primary">
               Go to My PDFs

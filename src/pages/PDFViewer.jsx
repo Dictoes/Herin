@@ -9,6 +9,7 @@ import {
   Loader2,
   ZoomIn,
   ZoomOut,
+  Sparkles,
 } from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import PDFPage from '../components/common/PDFPage';
@@ -150,7 +151,8 @@ export default function PDFViewer() {
     >
       {meta.kind === 'note' && <div className="field"><label htmlFor="note-title">Note title</label><input id="note-title" className="input" value={meta.name} onChange={e=>updatePdfMeta(id,{name:e.target.value})} /></div>}
       <div className="material-meta"><label htmlFor="subject">Subject</label><input id="subject" className="input" value={meta.subject || ''} placeholder="e.g. Biology" onChange={e=>updatePdfMeta(id, {subject:e.target.value})} />
-        {meta.kind !== 'note' && <button className="btn btn-primary" disabled={!!genStatus || meta.status === 'processing'} onClick={regenerate}>{genStatus ? 'Preparing study materials...' : 'Refresh extracted notes'}</button>}
+        {meta.kind !== 'note' && <button className="btn btn-primary" onClick={()=>{const panel=document.getElementById('ai-herin-assistant');panel?.focus({preventScroll:true});panel?.scrollIntoView({block:'start'});}}><Sparkles size={16}/>AI Herin Assistant</button>}
+        {meta.kind !== 'note' && <button className="btn btn-secondary" disabled={!!genStatus || meta.status === 'processing'} onClick={regenerate}>{genStatus ? 'Preparing study materials...' : 'Refresh extracted notes'}</button>}
         {meta.kind !== 'note' && <button className="btn btn-secondary" onClick={async()=>{try {const file=await getPdfFile(id); if(!file) throw Error(); const url=URL.createObjectURL(file); const a=document.createElement('a');a.href=url;a.download=meta.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);} catch {pushToast('Original file could not be downloaded.', 'error');}}}>Download original</button>}
       </div>
       {meta.status === 'error' && <div className="import-error" role="alert"><p>{meta.error}</p><button className="btn btn-secondary" disabled={!!genStatus} onClick={regenerate}>Retry extraction</button></div>}

@@ -48,7 +48,7 @@ export default function Dashboard() {
       <div className="stat-grid"><div className="stat-card"><CalendarDays size={19}/><strong>{today.length}</strong><span>Classes today</span></div><div className="stat-card"><FileText size={19}/><strong>{pdfs.filter(p=>p.kind !== 'note').length}</strong><span>Study materials</span></div><div className="stat-card"><NotebookPen size={19}/><strong>{Object.values(notes).filter(n=>n.content?.trim()).length}</strong><span>Saved notes</span></div></div>
       <div className="card study-overview"><h2>Your study progress</h2><p>{flashcards.filter(c=>c.reviews>0).length} of {flashcards.length} flashcards reviewed</p><p>Last quiz: {quizSession.score||0} correct · {(quizSession.index||0)+(quizSession.status?1:0)} answered</p><Link className="btn btn-secondary" to="/flashcards">Review flashcards</Link> <Link className="btn btn-secondary" to="/quiz">Continue saved quiz</Link></div>
       <div className="dash-grid">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+        <div className="dashboard-main-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {upcoming ? (
             <div className="next-class-card">
               <div className="next-class-eyebrow">
@@ -86,7 +86,7 @@ export default function Dashboard() {
               <EmptyState
                 icon={CalendarDays}
                 title="Nothing on today's schedule"
-                description="Days with no classes will always show up empty like this."
+                description="You have no classes scheduled for today. Make some time to review or plan ahead."
               />
             ) : (
               <div className="timeline">
@@ -117,6 +117,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
+          <Deadlines/>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -174,7 +175,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-      <Deadlines/>
     </AppLayout>
   );
 }
