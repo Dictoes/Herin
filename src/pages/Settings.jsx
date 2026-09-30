@@ -51,7 +51,7 @@ export default function Settings() {
   }
 
   return (
-    <AppLayout title="Settings" subtitle="Manage reminders and your data">
+    <AppLayout title="Settings" subtitle="Manage reminders and your data"><section className="card settings-section"><h2>Help & privacy</h2><p>Learn how to use Herin and how your information is handled.</p><div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a></div></section>
       {auth && <div className="card settings-section"><h2>Account</h2><div className="settings-row"><span>{auth.session?.user.email}</span><button className="btn btn-secondary" disabled={loggingOut} onClick={async()=>{setLoggingOut(true);try{await auth.logout();}catch(e){pushToast(e.message,'error');}finally{setLoggingOut(false);}}}>{loggingOut?'Saving and logging out...':'Log out'}</button></div></div>}
       {auth && hasLegacyData() && <div className="card settings-section"><h2>Existing data on this device</h2><p>Copy your previous local Herin workspace into this account. Your original local copy will be kept.</p><button className="btn btn-secondary" disabled={importing} onClick={async()=>{setImporting(true);try{await importLegacyData();window.location.reload();}catch(e){pushToast(e.message,'error');setImporting(false);}}}>{importing?'Importing…':'Import local workspace'}</button></div>}
       <div className="card settings-section"><h2>Install & offline access</h2><OfflineStatus details/><p>Enable background reminders below to receive alerts after closing Herin. On iPhone or iPad (iOS 16.4+), add Herin to your Home Screen, open it there, and allow notifications.</p></div>

@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from 'react';
+import InfoPage from './pages/InfoPage';
 import AuthProvider from './context/AuthContext';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
@@ -10,10 +11,9 @@ import Notes from './pages/Notes';
 import Settings from './pages/Settings';
 import Flashcards from './pages/Flashcards'; import Quiz from './pages/Quiz';
 
-export default function App() {
+function Workspace() {
   return (
     <AuthProvider><AppProvider>
-      <HashRouter>
         <Suspense fallback={<div className="page-content" role="status">Loading your workspace…</div>}><Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/schedule" element={<Schedule />} />
@@ -24,7 +24,10 @@ export default function App() {
           <Route path="/flashcards" element={<Flashcards />} /><Route path="/quiz" element={<Quiz />} />
           <Route path="*" element={<Dashboard />} />
         </Routes></Suspense>
-      </HashRouter>
     </AppProvider></AuthProvider>
   );
+}
+
+export default function App() {
+  return <HashRouter><Routes><Route path="/guide" element={<InfoPage />} /><Route path="/privacy" element={<InfoPage privacy />} /><Route path="*" element={<Workspace />} /></Routes></HashRouter>;
 }
