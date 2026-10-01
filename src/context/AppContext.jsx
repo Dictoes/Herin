@@ -8,6 +8,7 @@ import {generateHighlightMaterials} from '../utils/flashcardUtils';
 import usePersistedState from '../utils/usePersistedState';
 import { flushCloud } from '../utils/cloudStore';
 import { highlightPage } from '../utils/highlightPage';
+import { contrastRatio, customButtonTextColor, customThemeError, DEFAULT_CUSTOM_THEME } from '../utils/themePresets';
 
 const AppCtx = createContext(null);
 
@@ -76,10 +77,66 @@ export function AppProvider({ children }) {
     const apply = () => {
       document.documentElement.dataset.mode = settings.mode === 'system' ? (media.matches ? 'dark' : 'light') : settings.mode;
       document.documentElement.dataset.theme = settings.theme || 'ocean';
+      document.documentElement.dataset.contrast = settings.contrast || 'normal';
+      document.documentElement.dataset.fontSize = settings.fontSize || 'medium';
+      document.documentElement.dataset.density = settings.layoutDensity || 'comfortable';
+      document.documentElement.dataset.reduceAnimations = String(Boolean(settings.reduceAnimations));
+      document.documentElement.dataset.reduceDecorations = String(Boolean(settings.reduceDecorations));
+      document.documentElement.dataset.dimBackground = String(Boolean(settings.dimBackground));
+      document.documentElement.dataset.warmScreenColors = String(Boolean(settings.warmScreenColors));
+
+      const root = document.documentElement;
+      const customTheme = settings.customTheme || DEFAULT_CUSTOM_THEME;
+      const darkMode = root.dataset.mode === 'dark';
+      const customVariables = [
+        '--bg-primary', '--bg-secondary', '--surface-card', '--surface-raised',
+        '--text-primary', '--text-secondary', '--accent-primary', '--accent-secondary',
+        '--border-color', '--border-strong', '--paper', '--surface', '--surface-sunken',
+        '--ink', '--ink-soft', '--ink-faint', '--border', '--primary', '--primary-dark',
+        '--primary-tint', '--focus-color', '--custom-button', '--custom-button-text',
+      ];
+      if (settings.theme === 'custom' && !customThemeError(customTheme)) {
+        const customAccent = darkMode
+          && (contrastRatio(customTheme.accent, '#292534') < 4.5 || contrastRatio(customTheme.accent, '#393247') < 4.5)
+          ? '#d8c9f2'
+          : customTheme.accent;
+        const values = {
+          '--bg-primary': darkMode ? '#292534' : customTheme.background,
+          '--bg-secondary': darkMode ? '#332e40' : customTheme.surface,
+          '--surface-card': darkMode ? '#393247' : customTheme.surface,
+          '--surface-raised': darkMode ? '#46405a' : customTheme.surface,
+          '--text-primary': darkMode ? '#fff8f0' : customTheme.text,
+          '--text-secondary': darkMode ? '#d5ccdf' : customTheme.secondaryText,
+          '--accent-primary': customAccent,
+          '--accent-secondary': customAccent,
+          '--border-color': darkMode ? '#625773' : customTheme.border,
+          '--border-strong': darkMode ? '#857996' : customTheme.border,
+          '--paper': darkMode ? '#292534' : customTheme.background,
+          '--surface': darkMode ? '#393247' : customTheme.surface,
+          '--surface-sunken': darkMode ? '#332e40' : customTheme.background,
+          '--ink': darkMode ? '#fff8f0' : customTheme.text,
+          '--ink-soft': darkMode ? '#d5ccdf' : customTheme.secondaryText,
+          '--ink-faint': darkMode ? '#d5ccdf' : customTheme.secondaryText,
+          '--border': darkMode ? '#625773' : customTheme.border,
+          '--primary': customAccent,
+          '--primary-dark': darkMode ? '#d8c9f2' : customAccent,
+          '--primary-tint': darkMode ? '#40384f' : customTheme.background,
+          '--focus-color': darkMode ? '#d8c9f2' : customAccent,
+          '--custom-button': customTheme.button,
+          '--custom-button-text': customButtonTextColor(customTheme.button),
+        };
+        Object.entries(values).forEach(([name, value]) => root.style.setProperty(name, value));
+      } else {
+        customVariables.forEach((name) => root.style.removeProperty(name));
+      }
     };
     apply(); media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
-  }, [settings.mode, settings.theme]);
+  }, [
+    settings.mode, settings.theme, settings.customTheme, settings.contrast,
+    settings.fontSize, settings.layoutDensity, settings.reduceAnimations,
+    settings.reduceDecorations, settings.dimBackground, settings.warmScreenColors,
+  ]);
 
   useEffect(() => {
     const fail = () => pushToast('Storage is full or unavailable. Recent changes may not be saved. Export your data from Settings.', 'error');

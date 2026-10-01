@@ -3,16 +3,34 @@ import SupportHerin from '../components/common/SupportHerin';
 import { useAuth } from '../context/AuthContext';
 import { hasLegacyData, importLegacyData } from '../utils/importLegacy';
 import OfflineStatus from '../components/common/OfflineStatus';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Bell, Download, Trash2, ShieldCheck } from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useApp } from '../context/AppContext';
 import { storage } from '../utils/storage';
 import { notificationsSupported, currentPermission } from '../utils/notifications';
+import { customThemeError, DEFAULT_CUSTOM_THEME, THEME_PRESETS } from '../utils/themePresets';
 
 import {enableBackgroundPush,disableBackgroundPush,restoreBackgroundPush,backgroundPushSupported,testBackgroundPush} from '../utils/backgroundPush';
 import {flushCloud} from '../utils/cloudStore';
+
+const CUSTOM_THEME_VARIABLES = [
+  '--bg-primary', '--bg-secondary', '--surface-card', '--surface-raised',
+  '--text-primary', '--text-secondary', '--accent-primary', '--accent-secondary',
+  '--border-color', '--border-strong', '--paper', '--surface', '--surface-sunken',
+  '--ink', '--ink-soft', '--ink-faint', '--border', '--primary', '--primary-dark',
+  '--primary-tint', '--focus-color', '--custom-button', '--custom-button-text',
+];
+const CUSTOM_THEME_FIELDS = [
+  ['background', 'Background color'],
+  ['surface', 'Card and surface color'],
+  ['text', 'Primary text color'],
+  ['secondaryText', 'Secondary text color'],
+  ['accent', 'Accent color'],
+  ['border', 'Border color'],
+  ['button', 'Button color'],
+];
 
 export default function Settings() {
   const auth = useAuth();
@@ -22,7 +40,25 @@ export default function Settings() {
   const [permission, setPermission] = useState(currentPermission());
   const [confirmClear, setConfirmClear] = useState(false);
   const [pushEnabled,setPushEnabled]=useState(false),[pushBusy,setPushBusy]=useState(false),[pushError,setPushError]=useState('');
+  const [previewTheme, setPreviewTheme] = useState(null);
+  const previewSnapshot = useRef(null);
+  const customTheme = { ...DEFAULT_CUSTOM_THEME, ...settings.customTheme };
+  const customError = customThemeError(customTheme);
   useEffect(()=>{restoreBackgroundPush(auth?.session?.user.id).then(setPushEnabled).catch(()=>{});},[auth?.session?.user.id]);
+
+  function restoreThemePreview() {
+    const snapshot = previewSnapshot.current;
+    if (!snapshot) return;
+    const root = document.documentElement;
+    root.dataset.theme = snapshot.theme;
+    CUSTOM_THEME_VARIABLES.forEach((name) => {
+      if (snapshot.styles[name]) root.style.setProperty(name, snapshot.styles[name]);
+      else root.style.removeProperty(name);
+    });
+    previewSnapshot.current = null;
+  }
+
+  useEffect(() => () => restoreThemePreview(), []);
 
   useEffect(() => {
     setPermission(currentPermission());
@@ -30,6 +66,48 @@ export default function Settings() {
 
   function handleToggleNotifications(checked) {
     updateSettings({notificationsEnabled:checked});
+  }
+  function previewThemeChoice(theme) {
+    const root = document.documentElement;
+    if (!previewSnapshot.current) {
+      previewSnapshot.current = {
+        theme: root.dataset.theme || settings.theme || 'ocean',
+        styles: Object.fromEntries(CUSTOM_THEME_VARIABLES.map((name) => [name, root.style.getPropertyValue(name)])),
+      };
+    }
+    CUSTOM_THEME_VARIABLES.forEach((name) => root.style.removeProperty(name));
+    root.dataset.theme = theme;
+    setPreviewTheme(theme);
+  }
+  function applyTheme(theme) {
+    restoreThemePreview();
+    updateSettings({ theme });
+    setPreviewTheme(null);
+  }
+  function updateCustomThemeColor(field, value) {
+    const next = { ...customTheme, [field]: value };
+    if (customThemeError(next)) {
+      pushToast('That color would make text or controls difficult to read. Choose a higher-contrast color.', 'error');
+      return;
+    }
+    updateSettings({ customTheme: next });
+  }
+  function resetAppearance() {
+    restoreThemePreview();
+    updateSettings({
+      mode: 'system',
+      theme: 'ocean',
+      customTheme: DEFAULT_CUSTOM_THEME,
+      contrast: 'normal',
+      warmScreenColors: false,
+      fontSize: 'medium',
+      layoutDensity: 'comfortable',
+      reduceAnimations: false,
+      reduceDecorations: false,
+      dimBackground: false,
+    });
+    setPreviewTheme(null);
+    pushToast('Appearance settings reset.', 'success');
   }
   async function toggleBackground() {
     setPushBusy(true);setPushError('');
@@ -57,11 +135,65 @@ export default function Settings() {
       {auth && <div className="card settings-section"><h2>Account</h2><div className="settings-row"><span>{auth.session?.user.email}</span><button className="btn btn-secondary" disabled={loggingOut} onClick={async()=>{setLoggingOut(true);try{await auth.logout();}catch(e){pushToast(e.message,'error');}finally{setLoggingOut(false);}}}>{loggingOut?'Saving and logging out...':'Log out'}</button></div></div>}
       {auth && <SharedLinksManager/>}{auth && hasLegacyData() && <div className="card settings-section"><h2>Existing data on this device</h2><p>Copy your previous local Herin workspace into this account. Your original local copy will be kept.</p><button className="btn btn-secondary" disabled={importing} onClick={async()=>{setImporting(true);try{await importLegacyData();window.location.reload();}catch(e){pushToast(e.message,'error');setImporting(false);}}}>{importing?'Importing…':'Import local workspace'}</button></div>}
       <div className="card settings-section"><h2>Install & offline access</h2><OfflineStatus details/><p>Enable background reminders below to receive alerts after closing Herin. On iPhone or iPad (iOS 16.4+), add Herin to your Home Screen, open it there, and allow notifications.</p></div>
-      <div className="card settings-section">
+      <div className="card settings-section" id="appearance">
         <div className="section-title">Appearance & profile</div>
         <div className="settings-row"><div><div className="label">Display name</div><div className="desc">Personalize your account across devices.</div></div><input className="input" aria-label="Display name" style={{maxWidth:220}} value={settings.displayName || ''} onChange={e => updateSettings({displayName:e.target.value})} /></div>
         <div className="settings-row"><div><div className="label">Color mode</div><div className="desc">Choose your reading environment.</div></div><select className="select" aria-label="Color mode" value={settings.mode || 'system'} onChange={e => updateSettings({mode:e.target.value})}><option value="light">Light</option><option value="dark">Dark</option><option value="system">Follow system</option></select></div>
-        <div className="settings-row"><div><div className="label">Theme</div><div className="desc">A coordinated accent for your workspace.</div></div><div className="theme-options">{['ocean','forest','plum'].map(theme => <button key={theme} className={`chip ${settings.theme === theme ? 'active' : ''}`} aria-pressed={settings.theme === theme} onClick={() => updateSettings({theme})}>{theme[0].toUpperCase()+theme.slice(1)}</button>)}</div></div>
+        <div className="theme-gallery-heading">
+          <div><div className="label">Study theme</div><div className="desc">Preview a palette, then apply the one that feels comfortable.</div></div>
+          {previewTheme && <span className="theme-preview-status" role="status">Previewing {THEME_PRESETS.find((theme) => theme.id === previewTheme)?.label}</span>}
+        </div>
+        <div className="theme-gallery">
+          {THEME_PRESETS.map((theme) => (
+            <article className={`theme-card ${settings.theme === theme.id ? 'selected' : ''}`} key={theme.id}>
+              <div className="theme-card-swatches" aria-label={`${theme.label} palette preview`}>
+                {theme.swatches.map((color) => <span key={color} style={{ backgroundColor: color }} />)}
+              </div>
+              <strong>{theme.label}</strong>
+              <div className="theme-card-actions">
+                <button className="btn btn-ghost btn-sm" type="button" aria-label={`Preview ${theme.label}`} onClick={() => previewThemeChoice(theme.id)}>Preview</button>
+                <button className="btn btn-secondary btn-sm" type="button" aria-pressed={settings.theme === theme.id} onClick={() => applyTheme(theme.id)}>{settings.theme === theme.id ? 'Applied' : 'Apply'}</button>
+              </div>
+            </article>
+          ))}
+        </div>
+        {settings.theme === 'custom' && (
+          <div className="custom-theme-panel">
+            <div className="label">Custom colors</div>
+            <p className="desc">Colors are checked for readability before they are saved or applied.</p>
+            <div className="custom-theme-colors">
+              {CUSTOM_THEME_FIELDS.map(([field, label]) => (
+                <label className="custom-color-control" key={field}>
+                  <span>{label}</span>
+                  <input type="color" value={customTheme[field]} aria-label={label} onChange={(event) => updateCustomThemeColor(field, event.target.value)} />
+                </label>
+              ))}
+            </div>
+            {customError && <p className="custom-theme-error" role="alert">{customError}</p>}
+          </div>
+        )}
+        <div className="comfort-settings">
+          <div className="label">Reading comfort</div>
+          <div className="comfort-controls">
+            <label className="comfort-control"><span>Contrast</span><select className="select" aria-label="Contrast preference" value={settings.contrast || 'normal'} onChange={(event) => updateSettings({ contrast: event.target.value })}><option value="soft">Softer contrast</option><option value="normal">Standard</option><option value="high">Higher contrast</option></select></label>
+            <label className="comfort-control"><span>Text size</span><select className="select" aria-label="Text size" value={settings.fontSize || 'medium'} onChange={(event) => updateSettings({ fontSize: event.target.value })}><option value="small">Small</option><option value="medium">Default</option><option value="large">Large</option></select></label>
+            <label className="comfort-control"><span>Layout density</span><select className="select" aria-label="Layout density" value={settings.layoutDensity || 'comfortable'} onChange={(event) => updateSettings({ layoutDensity: event.target.value })}><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="spacious">Spacious</option></select></label>
+          </div>
+          <div className="comfort-toggles">
+            {[
+              ['warmScreenColors', 'Warm screen colors'],
+              ['reduceAnimations', 'Reduce animations'],
+              ['reduceDecorations', 'Reduce decorative elements'],
+              ['dimBackground', 'Dim the background'],
+            ].map(([setting, label]) => (
+              <label className="comfort-toggle" key={setting}>
+                <input type="checkbox" checked={Boolean(settings[setting])} onChange={(event) => updateSettings({ [setting]: event.target.checked })} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <div className="appearance-footer"><button className="btn btn-ghost" type="button" onClick={resetAppearance}>Reset appearance settings</button></div>
       </div>
       <div className="card settings-section">
         <div className="section-title">
