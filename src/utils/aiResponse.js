@@ -37,7 +37,10 @@ export async function readStudyResponse({data,error,response}, request) {
   if(request&&['quiz','both'].includes(request.contentType)){
     const questions=body.quiz_questions,selected=request.quizType||'multiple';
     const allowed=selected==='all'?['multiple','identification','enumeration','application']:[selected];
-    if(!Array.isArray(questions)||questions.length!==body.quizCount||(request.contentType==='quiz'&&!questions.length)||questions.length>request.quantity||questions.some(q=>!q||!allowed.includes(q.type)||typeof q.question!=='string'||!q.question.trim()||typeof q.correct_answer!=='string'||!q.correct_answer.trim()||typeof q.explanation!=='string'||!q.explanation.trim()))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
+    const typeCounts=new Map();
+    if(!Array.isArray(questions)||questions.length!==body.quizCount||(request.contentType==='quiz'&&!questions.length)||questions.length>request.quantity*(selected==='all'?allowed.length:1)||questions.some(q=>!q||!allowed.includes(q.type)||typeof q.question!=='string'||!q.question.trim()||typeof q.correct_answer!=='string'||!q.correct_answer.trim()||typeof q.explanation!=='string'||!q.explanation.trim()))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
+    for(const q of questions)typeCounts.set(q.type,(typeCounts.get(q.type)||0)+1);
+    if([...typeCounts.values()].some(count=>count>request.quantity))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
     const seen=new Set();
     for(const q of questions){
       const normalized=q.question.trim().toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ');

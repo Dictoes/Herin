@@ -27,6 +27,9 @@ test('quiz responses preserve and validate selected question formats',async()=>{
  ];
  const payload=quiz_questions=>({success:true,saved:true,flashcardCount:0,quizCount:quiz_questions.length,quiz_questions});
  assert.equal((await readStudyResponse({data:payload(questions)},{contentType:'quiz',quizType:'all',quantity:5})).quizCount,4);
+ const perType=Array.from({length:10},(_,i)=>questions.map(q=>({...q,question:`${q.question} ${i+1}`}))).flat();
+ assert.equal((await readStudyResponse({data:payload(perType)},{contentType:'quiz',quizType:'all',quantity:10})).quizCount,40);
+ await assert.rejects(readStudyResponse({data:payload([...perType,questions[0]])},{contentType:'quiz',quizType:'all',quantity:10}),/INVALID_BACKEND_RESPONSE/);
  assert.equal((await readStudyResponse({data:{...payload([]),flashcardCount:1}},{contentType:'both',quizType:'all',quantity:5})).quizCount,0);
  for(const [quizType,index] of [['multiple',0],['identification',1],['enumeration',2],['application',3]])assert.equal((await readStudyResponse({data:payload([questions[index]])},{contentType:'quiz',quizType,quantity:1})).quizCount,1);
  await assert.rejects(readStudyResponse({data:payload([{type:'true-false',question:'True or false?',choices:['True','False'],correct_answer:'True',explanation:'The source says so.'}])},{contentType:'quiz',quizType:'all',quantity:1}),/INVALID_BACKEND_RESPONSE/);

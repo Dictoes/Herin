@@ -97,6 +97,17 @@ test('all mode mixes supported types and empty supported quiz output reports ins
   const both=await generateSections([section],{...base,contentType:'both',quizType:'all'},{key:'test',fetcher:async()=>response({flashcards:[card],quiz_questions:[]})});
   assert.equal(both.flashcards.length,1);assert.equal(both.quiz_questions.length,0);
 });
+test('all mode requests and saves up to ten questions of each supported type',async()=>{
+  const types=['multiple','identification','enumeration','application'];
+  const questions=types.flatMap((type,index)=>Array.from({length:10},(_,i)=>({...typedQuestions[index],question:`${typedQuestions[index].question} Item ${i+1}?`})));
+  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:10},{key:'test',fetcher:async(_url,options)=>{
+    const prompt=JSON.parse(options.body).contents[0].parts[0].text;
+    assert.match(prompt,/Requested number of quiz questions per type when all types are selected, otherwise total: 10/);
+    return response({quiz_questions:questions});
+  }});
+  assert.equal(result.quiz_questions.length,40);
+  assert.deepEqual(Object.fromEntries(types.map(type=>[type,result.quiz_questions.filter(q=>q.type===type).length])),Object.fromEntries(types.map(type=>[type,10])));
+});
 function fixture({authenticated=true,owns=true,dbFailure=false,completed=false,topicOwns=true,classOwns=true}={}){
   let generated=0,saved=0;
   const client={auth:{getUser:async()=>({data:{user:authenticated?{id}:null}})},from(table){const q={select(){return q;},eq(){return q;},update(){return q;},maybeSingle:async()=>({data:table==='pdfs'?(owns?{id,extracted_text:{pages:[{pageNum:1,text:'Plants use light.'}]}}:null):table==='classes'?(classOwns?{id}:null):(topicOwns?{id,start_page:1,end_page:1}:null)})};return q;},rpc:async name=>{
