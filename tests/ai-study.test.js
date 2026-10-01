@@ -34,12 +34,22 @@ for(const difficulty of ['easy','medium','hard','mixed'])for(const contentType o
   const result=await callGemini(section,{...base,difficulty,contentType},{key:'test-only-placeholder',fetcher:async(url,options)=>{assert.ok(url.startsWith('https://generativelanguage.googleapis.com/'));assert.equal(JSON.parse(options.body).generationConfig.responseMimeType,'application/json');assert.equal(options.headers['x-goog-api-key'],'test-only-placeholder');return response(value);}});
   assert.ok(result.flashcards.length||result.quiz_questions.length||result.summaries.length);
 });
-test('invalid answers, difficulty, page, blank output and duplicate choices are rejected',()=>{
-  for(const value of [{...output,quiz_questions:[{...quiz,choices:['A','A','B','C']}]},{...output,quiz_questions:[{...quiz,correct_answer:'missing'}]},{...output,flashcards:[{...card,source_page:99}]},{...output,flashcards:[]},{...output,flashcards:[{...card,answer:'\u0000'}]},{...output,quiz_questions:[quiz,{...quiz,question:'What is used?'}]}])assert.throws(()=>validateOutput(value,base,section),StudyError);
+test('invalid flashcards and difficulty fail safely; malformed quiz questions are discarded',()=>{
+  for(const value of [{...output,flashcards:[{...card,source_page:99}]},{...output,flashcards:[]},{...output,flashcards:[{...card,answer:'\u0000'}]}])assert.throws(()=>validateOutput(value,base,section),StudyError);
+  for(const question of [{...quiz,choices:['A','A','B','C']},{...quiz,correct_answer:'missing'}])assert.deepEqual(validateOutput({quiz_questions:[question]},{...base,contentType:'quiz'},section).quiz_questions,[]);
   assert.throws(()=>validateOutput(output,{...base,difficulty:'hard'},section),StudyError);
   assert.equal(validateOutput({...output,flashcards:[card,card]},base,section).flashcards.length,1);
 });
-test('all supported quiz types preserve their UI formats and specific requests reject other types',()=>{
+test('valid questions survive malformed and duplicate model output without saving bad items',()=>{
+  const malformed={...typedQuestions[0],choices:['Light','Light','Sand','Stone']};
+  const result=validateOutput({quiz_questions:[malformed,typedQuestions[1],typedQuestions[1]]},{...base,contentType:'quiz',quizType:'all'},section);
+  assert.deepEqual(result.quiz_questions.map(item=>item.type),['identification']);
+});
+test('a quiz with no valid questions reports insufficient source instead of saving an empty quiz',async()=>{
+  const request={...base,contentType:'quiz'};
+  await assert.rejects(generateSections([section],request,{key:'test',fetcher:async()=>response({quiz_questions:[{...quiz,choices:['A','A','B','C']}]})}),e=>e.code==='INSUFFICIENT_SOURCE');
+});
+test('all supported quiz types preserve their UI formats and specific requests discard other types',()=>{
   const all={...base,contentType:'quiz',quizType:'all'};
   assert.deepEqual(responseSchema('quiz','all').properties.quiz_questions.items.properties.type.enum,['multiple','identification','enumeration','true-false','application']);
   const choicesSchema=responseSchema('quiz','all').properties.quiz_questions.items.properties.choices;
@@ -51,8 +61,8 @@ test('all supported quiz types preserve their UI formats and specific requests r
   for(const [type,index] of [['multiple',0],['identification',1],['enumeration',2],['true-false',3],['application',4]]) {
     assert.equal(validateOutput({quiz_questions:[typedQuestions[index]]},{...all,quizType:type},section).quiz_questions[0].type,type);
   }
-  assert.throws(()=>validateOutput({quiz_questions:[typedQuestions[1]]},{...all,quizType:'multiple'},section),StudyError);
-  assert.throws(()=>validateOutput({quiz_questions:[{...typedQuestions[2],expected_items:undefined}]},{...all,quizType:'enumeration'},section),StudyError);
+  assert.deepEqual(validateOutput({quiz_questions:[typedQuestions[1]]},{...all,quizType:'multiple'},section).quiz_questions,[]);
+  assert.deepEqual(validateOutput({quiz_questions:[{...typedQuestions[2],expected_items:undefined}]},{...all,quizType:'enumeration'},section).quiz_questions,[]);
 });
 test('Gemini schema permits the two choices required by true-or-false questions',async()=>{
   const request={...base,contentType:'quiz',quizType:'true-false',quantity:1};
@@ -86,10 +96,11 @@ test('a temporary Google 503 can recover within the bounded retry budget',async(
   const result=await callGemini(section,base,{key:'test',sleep:async()=>{},fetcher:async()=>++calls===1?new Response('',{status:503}):response(output)});
   assert.equal(calls,2);assert.equal(result.quiz_questions.length,1);
 });
-test('multiple chunks deduplicate flashcards but reject duplicate quiz questions',async()=>{
+test('multiple chunks deduplicate flashcards and quiz questions',async()=>{
   const result=await generateSections([section,section],{...base,contentType:'flashcards'},{key:'test',fetcher:async()=>response({flashcards:[card]})});
   assert.equal(result.flashcards.length,1);
-  await assert.rejects(generateSections([section,section],{...base,contentType:'quiz'},{key:'test',fetcher:async()=>response({quiz_questions:[quiz]})}),e=>e.code==='INVALID_RESPONSE');
+  const quizResult=await generateSections([section,section],{...base,contentType:'quiz'},{key:'test',fetcher:async()=>response({quiz_questions:[quiz]})});
+  assert.equal(quizResult.quiz_questions.length,1);
 });
 test('all mode mixes supported types and empty supported quiz output reports insufficient source',async()=>{
   const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:5},{key:'test',fetcher:async()=>response({quiz_questions:typedQuestions})});

@@ -51,28 +51,40 @@ export function validateOutput(value, request, section) {
   const result = {flashcards:[], quiz_questions:[], summaries:[]};
   const expectedKeys = request.contentType === 'summary' ? ['summary'] : request.contentType === 'flashcards' ? ['flashcards'] : request.contentType === 'quiz' ? ['quiz_questions'] : request.contentType === 'both' ? ['flashcards','quiz_questions'] : [];
   if (Object.keys(value).length !== expectedKeys.length || Object.keys(value).some(key=>!expectedKeys.includes(key))) fail();
+  const validQuizQuestion = (item, sectionPages, allowedTypes) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return null;
+    if (!text(item.question,1000) || !['easy','medium','hard'].includes(item.difficulty) || (request.difficulty !== 'mixed' && request.difficulty !== item.difficulty) || (item.source_page !== null && !sectionPages.includes(item.source_page))) return null;
+    const allowedKeys = ['type','question','difficulty','source_page','correct_answer','explanation','choices','expected_items'];
+    if (Object.keys(item).some(field=>!allowedKeys.includes(field)) || !allowedTypes.includes(item.type) || !text(item.correct_answer) || !text(item.explanation)) return null;
+    if (item.type === 'multiple') {
+      if (!Array.isArray(item.choices) || item.choices.length !== 4 || !item.choices.every(c=>text(c,1000)) || new Set(item.choices.map(c=>c.trim().toLowerCase())).size !== 4 || !item.choices.includes(item.correct_answer) || item.expected_items !== undefined) return null;
+    } else if (item.type === 'true-false') {
+      if (!['True','False'].includes(item.correct_answer) || JSON.stringify(item.choices)!=='["True","False"]' || item.expected_items !== undefined) return null;
+    } else if (item.type === 'enumeration') {
+      if (!Array.isArray(item.expected_items) || item.expected_items.length < 2 || item.expected_items.length > 20 || !item.expected_items.every(v=>text(v,1000)) || new Set(item.expected_items.map(v=>v.trim().toLowerCase())).size !== item.expected_items.length || item.choices !== undefined) return null;
+      const normalize = s=>s.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
+      if (normalize(item.correct_answer) !== normalize(item.expected_items.join('; '))) return null;
+    } else if (item.choices !== undefined || item.expected_items !== undefined) return null;
+    return {type:item.type,question:item.question.trim(),...(item.type==='multiple'?{choices:item.choices}:item.type==='true-false'?{choices:['True','False']}:item.type==='enumeration'?{expected_items:item.expected_items.map(v=>v.trim())}:{}),correct_answer:item.correct_answer.trim(),explanation:item.explanation.trim(),difficulty:item.difficulty,source_page:item.source_page};
+  };
   for (const key of ['flashcards','quiz_questions']) {
     const needed = request.contentType === 'both' || request.contentType === (key === 'flashcards' ? 'flashcards' : 'quiz');
     if (!needed) continue;
     if (!Array.isArray(value[key]) || value[key].length > 60 || (key === 'flashcards' && !value[key].length)) fail();
     const seen = new Set();
     for (const item of value[key]) {
-      if (!item || !text(item.question, 1000) || !['easy','medium','hard'].includes(item.difficulty) || (request.difficulty !== 'mixed' && request.difficulty !== item.difficulty) || (item.source_page !== null && !section.pages.includes(item.source_page))) fail();
       if (key === 'flashcards') {
+        if (!item || !text(item.question,1000) || !['easy','medium','hard'].includes(item.difficulty) || (request.difficulty !== 'mixed' && request.difficulty !== item.difficulty) || (item.source_page !== null && !section.pages.includes(item.source_page))) fail();
         if (!text(item.answer)) fail();
       } else {
         const allowedTypes = request.quizType === 'all' ? ['multiple','identification','enumeration','true-false','application'] : [request.quizType || 'multiple'];
-        const allowedKeys = ['type','question','difficulty','source_page','correct_answer','explanation','choices','expected_items'];
-        if (Object.keys(item).some(field=>!allowedKeys.includes(field)) || !allowedTypes.includes(item.type) || !text(item.correct_answer) || !text(item.explanation)) fail();
-        if (item.type === 'multiple') {
-          if (!Array.isArray(item.choices) || item.choices.length !== 4 || !item.choices.every(c=>text(c,1000)) || new Set(item.choices.map(c=>c.trim().toLowerCase())).size !== 4 || !item.choices.includes(item.correct_answer) || item.expected_items !== undefined) fail();
-        } else if (item.type === 'true-false') {
-          if (!['True','False'].includes(item.correct_answer) || JSON.stringify(item.choices)!=='["True","False"]' || item.expected_items !== undefined) fail();
-        } else if (item.type === 'enumeration') {
-          if (!Array.isArray(item.expected_items) || item.expected_items.length < 2 || item.expected_items.length > 20 || !item.expected_items.every(v=>text(v,1000)) || new Set(item.expected_items.map(v=>v.trim().toLowerCase())).size !== item.expected_items.length || item.choices !== undefined) fail();
-          const normalize = s=>s.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
-          if (normalize(item.correct_answer) !== normalize(item.expected_items.join('; '))) fail();
-        } else if (item.choices !== undefined || item.expected_items !== undefined) fail();
+        const question = validQuizQuestion(item,section.pages,allowedTypes);
+        if (!question) continue;
+        const normalized = question.question.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ');
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        result[key].push(question);
+        continue;
       }
       const normalized = item.question.trim().toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ');
       if (seen.has(normalized)) {
@@ -147,10 +159,7 @@ export async function generateSections(sections, request, options) {
     for (const item of ordered) {
       if (combined[key].length >= request.quantity) break;
       const normalized = item.question.toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ');
-      if (seen.has(normalized)) {
-        if (key === 'quiz_questions') throw new StudyError('INVALID_RESPONSE','AI returned duplicate quiz questions. Retry with a different topic.',502);
-        continue;
-      }
+      if (seen.has(normalized)) continue;
       seen.add(normalized);
       combined[key].push(item);
     }
