@@ -11,3 +11,7 @@ verify_jwt = false
 [functions.push-notifications]
 # User actions verify auth.getUser; the scheduler uses a separate server secret.
 verify_jwt = false
+
+[functions.shared-pdf]
+# Upload/remove actions verify auth.getUser; public check/download actions validate the share ID.
+verify_jwt = false

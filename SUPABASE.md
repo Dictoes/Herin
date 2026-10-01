@@ -8,7 +8,9 @@ Open a **new query** in Supabase SQL Editor and paste the entire contents of [`s
 
 The smaller file in `supabase/migrations` only upgrades an already-created schema. Do not paste the original unconditional `CREATE TABLE profiles` statements again.
 
-The full setup creates or retains all ten existing tables, enables owner-only RLS, and keeps `herin-pdfs` private. PDF object paths begin with the authenticated user's ID. Downloads use the user's session; there are no public PDF URLs.
+The full setup creates or retains all ten existing tables, enables owner-only RLS, and keeps `herin-pdfs` private. PDF object paths begin with the authenticated user's ID. Workspace downloads use the owner's session; shared downloads use short-lived signed URLs, never permanent public URLs.
+
+Apply `supabase/migrations/202609300003_shared_study.sql` if the sharing feature has not already been installed, then apply `supabase/migrations/202610010001_shared_study_pdf.sql`. Both migrations preserve existing shares and add only nullable attachment metadata and the corresponding share RPC fields. Deploy the `shared-pdf` Edge Function with `npx supabase functions deploy shared-pdf --project-ref ycejqtvemiesuiflyqmw`. The function uses the Edge Function's `SUPABASE_SERVICE_ROLE_KEY` server-side to upload into the existing private bucket and issue five-minute signed downloads; do not add that key to Vite variables or frontend code. Uploads are limited to 25 MiB and only the selected attachment is included in a shared link.
 
 ## Authentication setup
 

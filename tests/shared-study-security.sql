@@ -21,9 +21,10 @@ update public.pdfs set title='Changed later' where id='b103ac16-0000-4000-8000-0
 set local role anon;
 select set_config('request.jwt.claim.sub','',true);
 select pg_temp.assert_true((select title='Original title' and content_snapshot->>'text'='Original lesson' from public.get_shared_study('b103ac16-0000-4000-8000-000000000020')),'anonymous reads immutable snapshot');
+select pg_temp.assert_true((select pdf_file_name is null and pdf_file_size is null and pdf_mime_type is null and pdf_attached_at is null from public.get_shared_study('b103ac16-0000-4000-8000-000000000020')),'legacy shares remain text-only');
 select pg_temp.assert_true((select count(*)=0 from public.get_shared_study('b103ac16-0000-4000-8000-000000000099')),'missing is empty');
 select pg_temp.assert_true(not has_table_privilege('anon','public.shared_study_links','SELECT'),'anonymous cannot enumerate');
-select pg_temp.assert_true(not has_function_privilege('anon','public.create_study_share(uuid,text,uuid,text,text,text,jsonb)','EXECUTE'),'anonymous cannot publish');
+select pg_temp.assert_true(not has_function_privilege('anon','public.create_study_share(uuid,text,uuid,text,text,text,jsonb,text,bigint,text)','EXECUTE'),'anonymous cannot publish');
 select pg_temp.assert_true(not has_function_privilege('anon','public.revoke_study_share(uuid)','EXECUTE'),'anonymous cannot revoke');
 reset role;
 update public.shared_study_links set expires_at=now()-interval '1 minute' where share_id='b103ac16-0000-4000-8000-000000000020';

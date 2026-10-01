@@ -8,7 +8,7 @@ const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs',
 const pushTest=process.env.HERIN_PUSH_TEST==='1';
 const design=process.env.HERIN_DESIGN_TEST==='1'?require('./design-audit.cjs').capture:async()=>{};
 let aiCalls=0,aiFailure=false;
-const files=new Map();let rejectWrites=false,uploads=0,downloads=0;
+const files=new Map(),sharedPdfs=new Map();let rejectWrites=false,sharedUploadFailure=false,sharedUploadDelay=false,expireNextSignedUrl=false,sharedUploadCount=0,uploads=0,downloads=0;
 const jwt=()=>{const b=value=>Buffer.from(JSON.stringify(value)).toString('base64url');return b({alg:'HS256',typ:'JWT'})+'.'+b({sub:user.id,aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})+'.test';};
 const session=()=>({access_token:jwt(),refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user});
 (async()=>{
@@ -30,6 +30,31 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  if(url.pathname==='/auth/v1/token')return json(session());
  if(url.pathname==='/auth/v1/user')return json(user);
  if(url.pathname==='/auth/v1/logout')return json({});
+ if(url.pathname==='/functions/v1/shared-pdf'){
+  const contentType=request.headers()['content-type']||'',isForm=contentType.includes('multipart/form-data');
+  let body;
+  if(isForm){const form=await new Response(request.postDataBuffer(),{headers:{'content-type':contentType}}).formData();body={action:form.get('action'),share_id:form.get('share_id'),file:form.get('file')};}
+  else body=request.postDataJSON();
+  if(body.action==='upload'){
+   assert.ok(request.headers().authorization?.startsWith('Bearer '));
+   if(sharedUploadFailure)return json({error:'PDF test upload failed'},503);
+   if(sharedUploadDelay){await new Promise(resolve=>setTimeout(resolve,1000));if(request.failure())return;}
+   const file=body.file,name=file?.name||'lesson.pdf';let bytes=Buffer.from(await file.arrayBuffer());
+   if(!bytes.length)bytes=fs.readFileSync(path.join(__dirname,'fixtures/Biology-course.pdf'));
+   if(!bytes.subarray(0,5).equals(Buffer.from('%PDF-')))return json({error:'Unreadable PDF'},400);
+   sharedPdfs.set(body.share_id,{name,size:bytes.length,bytes});sharedUploadCount++;return json({file_name:name,file_size:bytes.length,mime_type:'application/pdf',attached_at:new Date().toISOString()});
+  }
+  if(body.action==='remove'){sharedPdfs.delete(body.share_id);return json({removed:true});}
+  const share=tables.shared_study_links.find(row=>row.share_id===body.share_id&&row.is_public);
+  const pdf=share&&sharedPdfs.get(body.share_id);
+  if(!share)return json({error:'This study link is no longer available.'},404);
+  if(!pdf)return json({error:'The attached PDF is missing or unreadable.'},404);
+  if(body.action==='check')return json({available:true,file_name:pdf.name,file_size:pdf.size});
+  if(body.action==='download'){
+   if(expireNextSignedUrl){expireNextSignedUrl=false;return json({error:'The signed PDF URL expired.'},410);}
+   return json({url:`https://ycejqtvemiesuiflyqmw.supabase.co/storage/v1/object/sign/herin-pdfs/${user.id}/shared/${body.share_id}.pdf?token=short-lived`,expires_in:300});
+  }
+ }
  if(url.pathname==='/functions/v1/push-notifications'){
   const body=request.postDataJSON();
   if(body.action==='public-key')return json({publicKey:'A'.repeat(87)});
@@ -51,7 +76,11 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  if(url.pathname==='/rest/v1/rpc/create_study_share'){
   const b=request.postDataJSON();assert.ok(['pdf','note','quiz','flashcard'].includes(b.p_kind));assert.deepEqual(Object.keys(b.p_snapshot).sort(),['flashcards','quizzes','text']);
-  if(!tables.shared_study_links.some(s=>s.share_id===b.p_share_id))tables.shared_study_links.push({share_id:b.p_share_id,user_id:user.id,title:b.p_title,subject:b.p_subject,content_snapshot:structuredClone(b.p_snapshot),created_at:new Date().toISOString(),is_public:true});return json(b.p_share_id);
+  if(!tables.shared_study_links.some(s=>s.share_id===b.p_share_id))tables.shared_study_links.push({share_id:b.p_share_id,user_id:user.id,title:b.p_title,subject:b.p_subject,content_snapshot:structuredClone(b.p_snapshot),created_at:new Date().toISOString(),is_public:true,pdf_file_name:b.p_pdf_file_name,pdf_file_size:b.p_pdf_file_size,pdf_mime_type:b.p_pdf_mime_type,pdf_attached_at:b.p_pdf_file_name?new Date().toISOString():null});return json(b.p_share_id);
+ }
+ if(url.pathname==='/rest/v1/rpc/get_shared_study'){
+  const id=request.postDataJSON().p_share_id,share=tables.shared_study_links.find(s=>s.share_id===id&&s.is_public);
+  return json(share?[{title:share.title,subject:share.subject,content_snapshot:share.content_snapshot,created_at:share.created_at,pdf_file_name:share.pdf_file_name,pdf_file_size:share.pdf_file_size,pdf_mime_type:share.pdf_mime_type,pdf_attached_at:share.pdf_attached_at}]:[]);
  }
  if(url.pathname==='/rest/v1/rpc/revoke_study_share'){const b=request.postDataJSON();tables.shared_study_links.find(s=>s.share_id===b.p_share_id&&s.user_id===user.id).is_public=false;return json(null);}
  if(url.pathname==='/rest/v1/rpc/save_quiz_attempt'){
@@ -75,6 +104,11 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   }
   if(method==='DELETE'){assert.equal(url.searchParams.get('user_id'),'eq.'+user.id);const ids=url.searchParams.get('id').slice(3,-1).split(',');tables[table]=tables[table].filter(r=>!ids.includes(r.id));return json([]);}
  }
+ if(url.pathname.includes('/storage/v1/object/sign/herin-pdfs/')){
+  const id=url.pathname.split('/').at(-1).replace(/\.pdf$/,'');const pdf=sharedPdfs.get(id);
+  if(!pdf)return json({message:'Not found'},404);
+  downloads++;return route.fulfill({status:200,headers:{'Content-Type':'application/pdf','Content-Disposition':`attachment; filename="${pdf.name}"`},body:pdf.bytes});
+ }
  if(url.pathname.startsWith('/storage/v1/object/')){
   const key=url.pathname.replace('/storage/v1/object/authenticated/','').replace('/storage/v1/object/','');
   if(method==='POST'){assert.ok(key.startsWith('herin-pdfs/'+user.id+'/'));const body=request.postDataBuffer();const contentType=request.headers()['content-type'];let bytes=body;if(contentType?.includes('multipart/form-data')){const form=await new Response(body,{headers:{'content-type':contentType}}).formData();const file=[...form.values()].find(v=>typeof v!=='string');bytes=Buffer.from(await file.arrayBuffer());}// Chromium omits disk file contents from intercepted multipart bodies.
@@ -84,7 +118,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  throw Error('Unhandled request: '+method+' '+url);
 });
-const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*(403|429)/.test(m.text()))errors.push(m.text());});
+const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*(403|429)/.test(m.text())&&!(sharedUploadFailure&&/Failed to load resource:.*503/.test(m.text())))errors.push(m.text());});
 const base=process.env.HERIN_URL||'http://127.0.0.1:4173';
 const saved=()=>page.getByText('Saved to Supabase',{exact:true}).first().waitFor();
 const navigate=async route=>{await page.goto(base+'/#/'+route);await page.locator('.topbar-title').waitFor();};
@@ -114,6 +148,8 @@ await page.getByRole('button',{name:'Yellow highlight',exact:true}).click();awai
 await page.getByRole('tab',{name:/Highlights/}).click();const regenerate=page.locator('.highlight-item').last().getByRole('button',{name:'Regenerate',exact:true});assert.ok(await regenerate.isEnabled());const cardCount=tables.flashcards.length;await regenerate.click();await saved();assert.equal(tables.flashcards.length,cardCount);
 await page.getByRole('tab',{name:'My notes',exact:true}).click();
 await page.getByRole('button',{name:'Edit note',exact:true}).click();await page.getByLabel('Your notes for this file').fill('Cloud notes survive refresh.');await saved();
+for(let i=0;i<50&&!tables.notes.some(note=>note.content==='Cloud notes survive refresh.');i++)await new Promise(resolve=>setTimeout(resolve,100));
+assert.ok(tables.notes.some(note=>note.content==='Cloud notes survive refresh.'),'note update must reach the simulated backend before reload');
 const readerUrl=page.url();await page.reload();await page.locator('.pdf-overlay > div').first().waitFor();await page.getByText('Cloud notes survive refresh.',{exact:true}).waitFor();assert.ok(downloads>=2);
 const engineeringText='Safety, mobility, accessibility, reliability, economy, constructability, environmental effects, and long- term performance matter.';
 await page.evaluate(({userId,text})=>{const key='herin:cloud:'+userId;const cached=JSON.parse(localStorage.getItem(key));cached.base=structuredClone(cached.model);const id=cached.model.pdfs.find(p=>p.kind!=='note').id;(cached.model.highlights[id]||=[]).push({id:'engineering-list-regression',source:'text',text,start:0,end:text.length,page:6,color:'green',generationStatus:'empty'});cached.pending=true;localStorage.setItem(key,JSON.stringify(cached));},{userId:user.id,text:engineeringText});
@@ -127,7 +163,7 @@ await page.evaluate(userId=>{const key='herin:cloud:'+userId;const cached=JSON.p
 await page.reload();await page.locator('.topbar-title').waitFor();await saved();assert.ok(tables.pdfs[0].extracted_text.pages[0].text.endsWith('\uFFFD\uFFFD'));
 await navigate('flashcards');await page.getByRole('button',{name:'Tap to reveal answer'}).click();await page.getByRole('button',{name:'Good',exact:true}).click();await saved();assert.equal(tables.flashcards[0].data.rating,'Good');
 await navigate('quiz');const answer=page.locator('#quiz-answer');if(await answer.count()){await answer.fill('wrong answer');await page.getByRole('button',{name:'Check answer',exact:true}).click();}else await page.locator('.quiz-options button').first().click();await saved();assert.ok(tables.user_preferences[0].data.quizSession.status);
-await require('./share-flow.cjs').run({browser,context,page,tables,base,readerUrl,navigate,saved});
+await require('./share-flow.cjs').run({browser,context,page,tables,sharedPdfs,base,readerUrl,navigate,saved,setUploadFailure:value=>sharedUploadFailure=value,setUploadDelay:value=>sharedUploadDelay=value,setExpireNextSignedUrl:value=>expireNextSignedUrl=value,uploadCount:()=>sharedUploadCount});
 await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await page.getByLabel('Class name',{exact:true}).fill('Cloud Biology');await page.getByRole('dialog').getByRole('button',{name:'Mon',exact:true}).click();await page.getByLabel('Start time').fill('10:00');await page.getByLabel('End time').fill('11:00');await page.getByRole('dialog').getByRole('button',{name:'Add class',exact:true}).click();await saved();assert.equal(tables.classes[0].name,'Cloud Biology');
 await page.getByRole('button',{name:'Add deadline',exact:true}).click();await page.getByLabel('Assignment',{exact:true}).fill('Cloud homework');await page.getByLabel('Due date and time').fill('2026-10-01T12:00');await page.getByRole('button',{name:'Save deadline',exact:true}).click();await saved();assert.equal(tables.assignments[0].title,'Cloud homework');
 await navigate('settings');await page.getByRole('button',{name:'Plum',exact:true}).click();await page.getByLabel('Color mode').selectOption('dark');await saved();await page.reload();await page.getByLabel('Color mode').waitFor();assert.equal(await page.locator('html').getAttribute('data-theme'),'plum');assert.equal(await page.locator('html').getAttribute('data-mode'),'dark');
