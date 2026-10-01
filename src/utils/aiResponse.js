@@ -36,7 +36,7 @@ export async function readStudyResponse({data,error,response}, request) {
   if(!body || body.saved===false || !Number.isInteger(body.flashcardCount) || !Number.isInteger(body.quizCount))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
   if(request&&['quiz','both'].includes(request.contentType)){
     const questions=body.quiz_questions,selected=request.quizType||'multiple';
-    const allowed=selected==='all'?['multiple','identification','enumeration','true-false','application']:[selected];
+    const allowed=selected==='all'?['multiple','identification','enumeration','application']:[selected];
     if(!Array.isArray(questions)||questions.length!==body.quizCount||(request.contentType==='quiz'&&!questions.length)||questions.length>request.quantity||questions.some(q=>!q||!allowed.includes(q.type)||typeof q.question!=='string'||!q.question.trim()||typeof q.correct_answer!=='string'||!q.correct_answer.trim()||typeof q.explanation!=='string'||!q.explanation.trim()))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
     const seen=new Set();
     for(const q of questions){
@@ -44,13 +44,11 @@ export async function readStudyResponse({data,error,response}, request) {
       if(seen.has(normalized))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
       seen.add(normalized);
       if(q.type==='multiple'&&(!Array.isArray(q.choices)||q.choices.length!==4||q.choices.some(choice=>typeof choice!=='string'||!choice.trim())||new Set(q.choices.map(choice=>choice.trim().toLocaleLowerCase())).size!==4||!q.choices.includes(q.correct_answer)||q.expected_items!==undefined))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
-      if(q.type==='true-false'&&(!Array.isArray(q.choices)||q.choices.length!==2||q.choices[0]!=='True'||q.choices[1]!=='False'||!['True','False'].includes(q.correct_answer)))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
       if(q.type==='enumeration'){
         if(!Array.isArray(q.expected_items)||q.expected_items.length<2||q.expected_items.some(item=>typeof item!=='string'||!item.trim())||new Set(q.expected_items.map(item=>item.trim().toLocaleLowerCase())).size!==q.expected_items.length||q.choices!==undefined)throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
         const normalize=value=>value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}\p{N}\s]/gu,' ').replace(/\s+/g,' ').trim();
         if(normalize(q.correct_answer)!==normalize(q.expected_items.join('; ')))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
       }
-      if(q.type==='true-false'&&q.expected_items!==undefined)throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
       if(['identification','application'].includes(q.type)&&(q.choices!==undefined||q.expected_items!==undefined))throw new Error(`${messages.INVALID_BACKEND_RESPONSE} [INVALID_BACKEND_RESPONSE]`);
     }
   }

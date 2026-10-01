@@ -18,18 +18,18 @@ test('only confirmed saves become a completed generation',async()=>{
  for(const data of [null,{}, {success:true,saved:false,flashcardCount:3,quizCount:0}])await assert.rejects(readStudyResponse({data}),/INVALID_BACKEND_RESPONSE/);
 });
 test('quiz responses preserve and validate selected question formats',async()=>{
- const question=(type,extra={})=>({type,question:`Question for ${type}?`,correct_answer:type==='enumeration'?'Light; Water':type==='true-false'?'True':'Answer',explanation:'Supported by the selected source.',...extra});
+ const question=(type,extra={})=>({type,question:`Question for ${type}?`,correct_answer:type==='enumeration'?'Light; Water':'Answer',explanation:'Supported by the selected source.',...extra});
  const questions=[
   question('multiple',{choices:['Answer','Other A','Other B','Other C']}),
   question('identification'),
   question('enumeration',{expected_items:['Light','Water']}),
-  question('true-false',{choices:['True','False']}),
   question('application')
  ];
  const payload=quiz_questions=>({success:true,saved:true,flashcardCount:0,quizCount:quiz_questions.length,quiz_questions});
- assert.equal((await readStudyResponse({data:payload(questions)},{contentType:'quiz',quizType:'all',quantity:5})).quizCount,5);
+ assert.equal((await readStudyResponse({data:payload(questions)},{contentType:'quiz',quizType:'all',quantity:5})).quizCount,4);
  assert.equal((await readStudyResponse({data:{...payload([]),flashcardCount:1}},{contentType:'both',quizType:'all',quantity:5})).quizCount,0);
- for(const [quizType,index] of [['multiple',0],['identification',1],['enumeration',2],['true-false',3],['application',4]])assert.equal((await readStudyResponse({data:payload([questions[index]])},{contentType:'quiz',quizType,quantity:1})).quizCount,1);
+ for(const [quizType,index] of [['multiple',0],['identification',1],['enumeration',2],['application',3]])assert.equal((await readStudyResponse({data:payload([questions[index]])},{contentType:'quiz',quizType,quantity:1})).quizCount,1);
+ await assert.rejects(readStudyResponse({data:payload([{type:'true-false',question:'True or false?',choices:['True','False'],correct_answer:'True',explanation:'The source says so.'}])},{contentType:'quiz',quizType:'all',quantity:1}),/INVALID_BACKEND_RESPONSE/);
  await assert.rejects(readStudyResponse({data:payload([questions[1]])},{contentType:'quiz',quizType:'multiple',quantity:1}),/INVALID_BACKEND_RESPONSE/);
  await assert.rejects(readStudyResponse({data:payload([question('enumeration',{correct_answer:'Light; Air',expected_items:['Light','Water']})])},{contentType:'quiz',quizType:'enumeration',quantity:1}),/INVALID_BACKEND_RESPONSE/);
  await assert.rejects(readStudyResponse({data:payload([questions[0],questions[0]])},{contentType:'quiz',quizType:'multiple',quantity:2}),/INVALID_BACKEND_RESPONSE/);

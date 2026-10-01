@@ -11,7 +11,6 @@ const typedQuestions=[
   quiz,
   {type:'identification',question:'What provides the energy?',correct_answer:'Light',explanation:'The source says photosynthesis uses light.',difficulty:'easy',source_page:1},
   {type:'enumeration',question:'What two things does the process use?',expected_items:['Light','Water'],correct_answer:'Light; Water',explanation:'Both items appear in the source.',difficulty:'easy',source_page:1},
-  {type:'true-false',question:'Photosynthesis uses light.',choices:['True','False'],correct_answer:'True',explanation:'The source directly says light is used.',difficulty:'easy',source_page:1},
   {type:'application',question:'What energy source should be available for photosynthesis?',correct_answer:'Light',explanation:'The source identifies light as the energy source.',difficulty:'easy',source_page:1}
 ];
 const output={flashcards:[card],quiz_questions:[quiz]};
@@ -20,6 +19,7 @@ test('AI request rejects empty, invalid identifiers, quantity and difficulty; de
   for(const b of [null,{}, {...base,pdfId:'pdf_legacy'},{...base,quantity:0},{...base,quantity:31},{...base,difficulty:'expert'},{...base,topicId:'other'}])assert.throws(()=>validateRequest(b),StudyError);
   assert.deepEqual(validateRequest({pdfId:id,requestId}),{...base,classId:null,topicId:null});
   assert.throws(()=>validateRequest({...base,quizType:'unsupported'}),StudyError);
+  assert.throws(()=>validateRequest({...base,quizType:'true-false'}),StudyError);
   assert.equal(validateRequest({...base,quizType:'all'}).quizType,'all');
 });
 test('large PDF chunks preserve every page, topic range and last text; scans fail before AI',()=>{
@@ -49,33 +49,21 @@ test('a quiz with no valid questions reports insufficient source instead of savi
   const request={...base,contentType:'quiz'};
   await assert.rejects(generateSections([section],request,{key:'test',fetcher:async()=>response({quiz_questions:[{...quiz,choices:['A','A','B','C']}]})}),e=>e.code==='INSUFFICIENT_SOURCE');
 });
-test('all supported quiz types preserve their UI formats and specific requests discard other types',()=>{
+test('supported quiz types preserve their UI formats and specific requests discard other types',()=>{
   const all={...base,contentType:'quiz',quizType:'all'};
-  assert.deepEqual(responseSchema('quiz','all').properties.quiz_questions.items.properties.type.enum,['multiple','identification','enumeration','true-false','application']);
+  assert.deepEqual(responseSchema('quiz','all').properties.quiz_questions.items.properties.type.enum,['multiple','identification','enumeration','application']);
   const choicesSchema=responseSchema('quiz','all').properties.quiz_questions.items.properties.choices;
   assert.equal(choicesSchema.type,'array');
   assert.equal(choicesSchema.minItems,undefined);
   assert.equal(choicesSchema.maxItems,undefined);
-  assert.deepEqual(validateOutput({quiz_questions:typedQuestions},all,section).quiz_questions.map(q=>q.type),['multiple','identification','enumeration','true-false','application']);
+  assert.deepEqual(validateOutput({quiz_questions:typedQuestions},all,section).quiz_questions.map(q=>q.type),['multiple','identification','enumeration','application']);
   assert.deepEqual(validateOutput({quiz_questions:[typedQuestions[2]]},{...all,quizType:'enumeration'},section).quiz_questions[0].expected_items,['Light','Water']);
-  for(const [type,index] of [['multiple',0],['identification',1],['enumeration',2],['true-false',3],['application',4]]) {
+  for(const [type,index] of [['multiple',0],['identification',1],['enumeration',2],['application',3]]) {
     assert.equal(validateOutput({quiz_questions:[typedQuestions[index]]},{...all,quizType:type},section).quiz_questions[0].type,type);
   }
+  assert.deepEqual(validateOutput({quiz_questions:[{type:'true-false',question:'Photosynthesis uses light.',choices:['True','False'],correct_answer:'True',explanation:'The source says so.',difficulty:'easy',source_page:1}]},all,section).quiz_questions,[]);
   assert.deepEqual(validateOutput({quiz_questions:[typedQuestions[1]]},{...all,quizType:'multiple'},section).quiz_questions,[]);
   assert.deepEqual(validateOutput({quiz_questions:[{...typedQuestions[2],expected_items:undefined}]},{...all,quizType:'enumeration'},section).quiz_questions,[]);
-});
-test('Gemini schema permits the two choices required by true-or-false questions',async()=>{
-  const request={...base,contentType:'quiz',quizType:'true-false',quantity:1};
-  let sentSchema;
-  const result=await callGemini(section,request,{key:'test',fetcher:async(_url,options)=>{
-    sentSchema=JSON.parse(options.body).generationConfig.responseJsonSchema;
-    return response({quiz_questions:[typedQuestions[3]]});
-  }});
-  const choices=sentSchema.properties.quiz_questions.items.properties.choices;
-  assert.equal(choices.type,'array');
-  assert.equal(choices.minItems,undefined);
-  assert.equal(choices.maxItems,undefined);
-  assert.equal(result.quiz_questions[0].type,'true-false');
 });
 test('provider errors are safe, quota is not retried, transient retry is bounded',async()=>{
   for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'MODEL_UNAVAILABLE']]){
@@ -104,7 +92,7 @@ test('multiple chunks deduplicate flashcards and quiz questions',async()=>{
 });
 test('all mode mixes supported types and empty supported quiz output reports insufficient source',async()=>{
   const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:5},{key:'test',fetcher:async()=>response({quiz_questions:typedQuestions})});
-  assert.deepEqual(result.quiz_questions.map(q=>q.type),['multiple','identification','enumeration','true-false','application']);
+  assert.deepEqual(result.quiz_questions.map(q=>q.type),['multiple','identification','enumeration','application']);
   await assert.rejects(generateSections([section],{...base,contentType:'quiz',quizType:'identification'},{key:'test',fetcher:async()=>response({quiz_questions:[]})}),e=>e.code==='INSUFFICIENT_SOURCE');
   const both=await generateSections([section],{...base,contentType:'both',quizType:'all'},{key:'test',fetcher:async()=>response({flashcards:[card],quiz_questions:[]})});
   assert.equal(both.flashcards.length,1);assert.equal(both.quiz_questions.length,0);

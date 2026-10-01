@@ -193,18 +193,6 @@ export function generateStudyMaterials(data, _legacyCount, meta = {}, onProgress
       options.splice(parseInt(hash(q.id), 36) % 4, 0, q.correctAnswer);
       rawQuizQuestions.push({ ...q, id: `${q.id}_mc`, type: 'multiple', options });
     }
-    const negate = parseInt(hash(q.id),36)%2===0 && /\b(?:is|are)\b(?!\s+not)/i.test(q.sourceText) && !/\bnot\b/i.test(q.sourceText);
-    const statement=negate?q.sourceText.replace(/\b(is|are)\b/i,'$1 not'):q.sourceText;
-    const tfQuestion = `True or False: ${statement.replace(/^[a-z]/, c => c.toUpperCase())}`;
-    rawQuizQuestions.push({
-      ...q,
-      id: `${q.id}_tf`,
-      type: 'true-false',
-      question: tfQuestion,
-      options: ['True', 'False'],
-      correctAnswer: negate?'False':'True',
-      explanation: `${negate?'The statement contradicts the source.':'The source supports the statement.'} Source: ${q.sourceText}`
-    });
   }
   rawQuizQuestions.push(...enumerations);
   

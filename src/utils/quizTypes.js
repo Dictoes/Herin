@@ -3,7 +3,6 @@ export const quizTypeOptions = [
   {value:'multiple',label:'Multiple choice'},
   {value:'identification',label:'Identification'},
   {value:'enumeration',label:'Enumeration'},
-  {value:'true-false',label:'True or false'},
   {value:'application',label:'Understanding'}
 ];
 
