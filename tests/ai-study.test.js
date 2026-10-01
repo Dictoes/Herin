@@ -1,17 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateRequest,sectionsFrom,validateOutput,callGemini,generateSections,StudyError} from '../supabase/functions/generate-study-content/core.js';
+import {validateRequest,sectionsFrom,responseSchema,validateOutput,callGemini,generateSections,StudyError} from '../supabase/functions/generate-study-content/core.js';
 import {createHandler} from '../supabase/functions/generate-study-content/handler.js';
 const id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',requestId='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
 const base={pdfId:id,requestId,contentType:'both',quantity:10,difficulty:'mixed'};
 const section={text:'[Page 1] Photosynthesis uses light.',pages:[1]};
 const card={question:'What does photosynthesis use?',answer:'Light',difficulty:'easy',source_page:1};
-const quiz={question:'What is used?',choices:['Light','Sand','Metal','Stone'],correct_answer:'Light',explanation:'The source says it uses light.',difficulty:'easy',source_page:1};
+const quiz={type:'multiple',question:'What is used?',choices:['Light','Sand','Metal','Stone'],correct_answer:'Light',explanation:'The source says it uses light.',difficulty:'easy',source_page:1};
+const typedQuestions=[
+  quiz,
+  {type:'identification',question:'What provides the energy?',correct_answer:'Light',explanation:'The source says photosynthesis uses light.',difficulty:'easy',source_page:1},
+  {type:'enumeration',question:'What two things does the process use?',expected_items:['Light','Water'],correct_answer:'Light; Water',explanation:'Both items appear in the source.',difficulty:'easy',source_page:1},
+  {type:'true-false',question:'Photosynthesis uses light.',choices:['True','False'],correct_answer:'True',explanation:'The source directly says light is used.',difficulty:'easy',source_page:1},
+  {type:'application',question:'What energy source should be available for photosynthesis?',correct_answer:'Light',explanation:'The source identifies light as the energy source.',difficulty:'easy',source_page:1}
+];
 const output={flashcards:[card],quiz_questions:[quiz]};
 const response=data=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(data)}]}}]}));
 test('AI request rejects empty, invalid identifiers, quantity and difficulty; defaults are safe',()=>{
   for(const b of [null,{}, {...base,pdfId:'pdf_legacy'},{...base,quantity:0},{...base,quantity:31},{...base,difficulty:'expert'},{...base,topicId:'other'}])assert.throws(()=>validateRequest(b),StudyError);
   assert.deepEqual(validateRequest({pdfId:id,requestId}),{...base,classId:null,topicId:null});
+  assert.throws(()=>validateRequest({...base,quizType:'unsupported'}),StudyError);
+  assert.equal(validateRequest({...base,quizType:'all'}).quizType,'all');
 });
 test('large PDF chunks preserve every page, topic range and last text; scans fail before AI',()=>{
   const pages=Array.from({length:80},(_,i)=>({pageNum:i+1,text:`Content ${i+1} `.repeat(200)}));
@@ -21,14 +30,25 @@ test('large PDF chunks preserve every page, topic range and last text; scans fai
   assert.throws(()=>sectionsFrom({pages:[{pageNum:1,text:'a'.repeat(240001)}]}),e=>e.code==='PDF_TOO_LARGE');
 });
 for(const difficulty of ['easy','medium','hard','mixed'])for(const contentType of ['flashcards','quiz','both','summary'])test(`AI validates ${contentType} / ${difficulty}`,async()=>{
-  const value={flashcards:[{...card,difficulty:difficulty==='mixed'?'easy':difficulty}],quiz_questions:[{...quiz,difficulty:difficulty==='mixed'?'medium':difficulty}],summary:'Plants use light.'};
+  const value=contentType==='flashcards'?{flashcards:[{...card,difficulty:difficulty==='mixed'?'easy':difficulty}]}:contentType==='quiz'?{quiz_questions:[{...quiz,difficulty:difficulty==='mixed'?'medium':difficulty}]}:contentType==='both'?{flashcards:[{...card,difficulty:difficulty==='mixed'?'easy':difficulty}],quiz_questions:[{...quiz,difficulty:difficulty==='mixed'?'medium':difficulty}]}:{summary:'Plants use light.'};
   const result=await callGemini(section,{...base,difficulty,contentType},{key:'test-only-placeholder',fetcher:async(url,options)=>{assert.ok(url.startsWith('https://generativelanguage.googleapis.com/'));assert.equal(JSON.parse(options.body).generationConfig.responseMimeType,'application/json');assert.equal(options.headers['x-goog-api-key'],'test-only-placeholder');return response(value);}});
   assert.ok(result.flashcards.length||result.quiz_questions.length||result.summaries.length);
 });
 test('invalid answers, difficulty, page, blank output and duplicate choices are rejected',()=>{
-  for(const value of [{...output,quiz_questions:[{...quiz,choices:['A','A','B','C']}]},{...output,quiz_questions:[{...quiz,correct_answer:'missing'}]},{...output,flashcards:[{...card,source_page:99}]},{...output,flashcards:[]},{...output,flashcards:[{...card,answer:'\u0000'}]}])assert.throws(()=>validateOutput(value,base,section),StudyError);
+  for(const value of [{...output,quiz_questions:[{...quiz,choices:['A','A','B','C']}]},{...output,quiz_questions:[{...quiz,correct_answer:'missing'}]},{...output,flashcards:[{...card,source_page:99}]},{...output,flashcards:[]},{...output,flashcards:[{...card,answer:'\u0000'}]},{...output,quiz_questions:[quiz,{...quiz,question:'What is used?'}]}])assert.throws(()=>validateOutput(value,base,section),StudyError);
   assert.throws(()=>validateOutput(output,{...base,difficulty:'hard'},section),StudyError);
   assert.equal(validateOutput({...output,flashcards:[card,card]},base,section).flashcards.length,1);
+});
+test('all supported quiz types preserve their UI formats and specific requests reject other types',()=>{
+  const all={...base,contentType:'quiz',quizType:'all'};
+  assert.deepEqual(responseSchema('quiz','all').properties.quiz_questions.items.properties.type.enum,['multiple','identification','enumeration','true-false','application']);
+  assert.deepEqual(validateOutput({quiz_questions:typedQuestions},all,section).quiz_questions.map(q=>q.type),['multiple','identification','enumeration','true-false','application']);
+  assert.deepEqual(validateOutput({quiz_questions:[typedQuestions[2]]},{...all,quizType:'enumeration'},section).quiz_questions[0].expected_items,['Light','Water']);
+  for(const [type,index] of [['multiple',0],['identification',1],['enumeration',2],['true-false',3],['application',4]]) {
+    assert.equal(validateOutput({quiz_questions:[typedQuestions[index]]},{...all,quizType:type},section).quiz_questions[0].type,type);
+  }
+  assert.throws(()=>validateOutput({quiz_questions:[typedQuestions[1]]},{...all,quizType:'multiple'},section),StudyError);
+  assert.throws(()=>validateOutput({quiz_questions:[{...typedQuestions[2],expected_items:undefined}]},{...all,quizType:'enumeration'},section),StudyError);
 });
 test('provider errors are safe, quota is not retried, transient retry is bounded',async()=>{
   for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'MODEL_UNAVAILABLE']]){
@@ -49,9 +69,17 @@ test('a temporary Google 503 can recover within the bounded retry budget',async(
   const result=await callGemini(section,base,{key:'test',sleep:async()=>{},fetcher:async()=>++calls===1?new Response('',{status:503}):response(output)});
   assert.equal(calls,2);assert.equal(result.quiz_questions.length,1);
 });
-test('multiple chunks deduplicate cards and quiz questions before saving',async()=>{
-  const result=await generateSections([section,section],base,{key:'test',fetcher:async()=>response(output)});
-  assert.equal(result.flashcards.length,1);assert.equal(result.quiz_questions.length,1);
+test('multiple chunks deduplicate flashcards but reject duplicate quiz questions',async()=>{
+  const result=await generateSections([section,section],{...base,contentType:'flashcards'},{key:'test',fetcher:async()=>response({flashcards:[card]})});
+  assert.equal(result.flashcards.length,1);
+  await assert.rejects(generateSections([section,section],{...base,contentType:'quiz'},{key:'test',fetcher:async()=>response({quiz_questions:[quiz]})}),e=>e.code==='INVALID_RESPONSE');
+});
+test('all mode mixes supported types and empty supported quiz output reports insufficient source',async()=>{
+  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:5},{key:'test',fetcher:async()=>response({quiz_questions:typedQuestions})});
+  assert.deepEqual(result.quiz_questions.map(q=>q.type),['multiple','identification','enumeration','true-false','application']);
+  await assert.rejects(generateSections([section],{...base,contentType:'quiz',quizType:'identification'},{key:'test',fetcher:async()=>response({quiz_questions:[]})}),e=>e.code==='INSUFFICIENT_SOURCE');
+  const both=await generateSections([section],{...base,contentType:'both',quizType:'all'},{key:'test',fetcher:async()=>response({flashcards:[card],quiz_questions:[]})});
+  assert.equal(both.flashcards.length,1);assert.equal(both.quiz_questions.length,0);
 });
 function fixture({authenticated=true,owns=true,dbFailure=false,completed=false,topicOwns=true,classOwns=true}={}){
   let generated=0,saved=0;

@@ -1,7 +1,7 @@
 import {StudyError, validateRequest, sectionsFrom, generateSections} from './core.js';
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const reply = (body, status = 200) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
-const success = result => reply({...result,success:true,saved:true,flashcards:result.flashcards||[],quiz_questions:(result.quiz?.questions||[]).map(q=>({question:q.question,choices:q.options,correct_answer:q.correctAnswer,explanation:q.explanation,difficulty:q.difficulty,source_page:q.sourcePage}))});
+const success = result => reply({...result,success:true,saved:true,flashcards:result.flashcards||[],quiz_questions:(result.quiz?.questions||[]).map(q=>({type:q.type,question:q.question,...(Array.isArray(q.options)?{choices:q.options}:{}),...(Array.isArray(q.expectedItems)?{expected_items:q.expectedItems}:{}),correct_answer:q.correctAnswer,explanation:q.explanation,difficulty:q.difficulty,source_page:q.sourcePage}))});
 const failure = error => {
   const detail={code:error.code,message:error.message,...(Number.isInteger(error.providerStatus)?{providerStatus:error.providerStatus}:{})};
   // Top-level fields retain compatibility with tabs running an earlier app version.

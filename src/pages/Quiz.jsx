@@ -13,8 +13,9 @@ import { checkQuizAnswer } from '../utils/flashcardUtils';
 import {supabase} from '../lib/supabase';
 import {flushCloud} from '../utils/cloudStore';
 import {databaseId} from '../utils/cloudRepository';
+import {quizTypeLabels,quizTypeOptions} from '../utils/quizTypes';
 
-const labels = {multiple:'Multiple choice',identification:'Identification',enumeration:'Enumeration','true-false':'True or false',application:'Understanding'};
+const labels = quizTypeLabels;
 export default function Quiz() {
   const { quizQuestions, pdfs,updateQuizQuestion,deleteQuizQuestion } = useApp();
   const [editing,setEditing]=useState(null),[deleting,setDeleting]=useState(null);
@@ -53,7 +54,7 @@ export default function Quiz() {
     return()=>{active=false;};
   },[signature]);
   return <AppLayout title="Quiz practice" subtitle="Recall, check, and build your understanding">
-    <div className="toolbar"><select className="select source-filter" aria-label="Quiz document" value={source} onChange={e=>{setSession(p=>({...p,source:e.target.value,index:0,answer:'',status:null,score:0}));}}><option value="">All documents</option>{pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><select className="select source-filter" aria-label="Question type" value={type} onChange={e=>{setSession(p=>({...p,type:e.target.value,index:0,answer:'',status:null,score:0}));}}><option value="">All question types</option>{Object.entries(labels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></div>
+    <div className="toolbar"><select className="select source-filter" aria-label="Quiz document" value={source} onChange={e=>{setSession(p=>({...p,source:e.target.value,index:0,answer:'',status:null,score:0}));}}><option value="">All documents</option>{pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><select className="select source-filter" aria-label="Question type" value={type||'all'} onChange={e=>{setSession(p=>({...p,type:e.target.value==='all'?'':e.target.value,index:0,answer:'',status:null,score:0}));}}>{quizTypeOptions.map(({value,label})=><option key={value} value={value}>{label}</option>)}</select></div>
     {!questions.length ? <EmptyState icon={ListChecks} title="No questions in this selection" description="Highlight a complete lesson idea in a PDF or select another question type. Multiple choice needs distinct terms; enumeration needs a list in the source." action={<Link className="btn btn-primary" to="/pdfs">My PDFs</Link>}/> : !q ? <section className="card quiz-card"><span className="badge badge-live">Session complete</span><h2>{score} of {questions.length} correct</h2><p>Review the source for anything you missed.</p><button className="btn btn-primary" onClick={reset}>Practice again</button></section> : <section className="card quiz-card">
       <div className="quiz-progress"><span>Question {index+1} of {questions.length}</span><span>{score} correct</span></div><progress value={index} max={questions.length} aria-label="Quiz progress"/>
       <div className="study-card-meta"><span className="badge badge-info">{labels[q.type] || q.type}</span><span>Page {q.sourcePage || '-'}</span>{q.pdfId && <Link to={`/pdfs/${q.pdfId}?page=${q.sourcePage||1}`}>Source</Link>}</div>
