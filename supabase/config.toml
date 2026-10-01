@@ -1,7 +1,7 @@
 [auth]
 # Verification emails must return to the public site, including on phones.
-site_url = "https://herin-phi.vercel.app/"
-additional_redirect_urls = ["https://herin-phi.vercel.app/"]
+site_url = "https://herins.vercel.app/"
+additional_redirect_urls = ["https://herins.vercel.app/"]
 
 [functions.generate-study-content]
 # Authentication is explicitly verified with auth.getUser in the handler.
