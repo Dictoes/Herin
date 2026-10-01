@@ -39,7 +39,7 @@ export function responseSchema(type, quizType = 'multiple') {
   if (type === 'quiz' || type === 'both') {
     const quizTypes = ['multiple','identification','enumeration','true-false','application'];
     const selected = quizType === 'all' ? quizTypes : [quizType];
-    properties.quiz_questions = {type:'array',items:{type:'object',properties:{...common,type:{type:'string',enum:selected},choices:{type:'array',items:string,minItems:4,maxItems:4},expected_items:{type:'array',items:string,minItems:2},correct_answer:string,explanation:string},required:[...Object.keys(common),'type','correct_answer','explanation']}};
+    properties.quiz_questions = {type:'array',items:{type:'object',properties:{...common,type:{type:'string',enum:selected},choices:{type:'array',items:string},expected_items:{type:'array',items:string,minItems:2},correct_answer:string,explanation:string},required:[...Object.keys(common),'type','correct_answer','explanation']}};
   }
   if (type === 'summary') properties.summary = string;
   return {type:'object',properties,required:Object.keys(properties)};

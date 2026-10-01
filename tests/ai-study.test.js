@@ -42,6 +42,10 @@ test('invalid answers, difficulty, page, blank output and duplicate choices are 
 test('all supported quiz types preserve their UI formats and specific requests reject other types',()=>{
   const all={...base,contentType:'quiz',quizType:'all'};
   assert.deepEqual(responseSchema('quiz','all').properties.quiz_questions.items.properties.type.enum,['multiple','identification','enumeration','true-false','application']);
+  const choicesSchema=responseSchema('quiz','all').properties.quiz_questions.items.properties.choices;
+  assert.equal(choicesSchema.type,'array');
+  assert.equal(choicesSchema.minItems,undefined);
+  assert.equal(choicesSchema.maxItems,undefined);
   assert.deepEqual(validateOutput({quiz_questions:typedQuestions},all,section).quiz_questions.map(q=>q.type),['multiple','identification','enumeration','true-false','application']);
   assert.deepEqual(validateOutput({quiz_questions:[typedQuestions[2]]},{...all,quizType:'enumeration'},section).quiz_questions[0].expected_items,['Light','Water']);
   for(const [type,index] of [['multiple',0],['identification',1],['enumeration',2],['true-false',3],['application',4]]) {
@@ -49,6 +53,19 @@ test('all supported quiz types preserve their UI formats and specific requests r
   }
   assert.throws(()=>validateOutput({quiz_questions:[typedQuestions[1]]},{...all,quizType:'multiple'},section),StudyError);
   assert.throws(()=>validateOutput({quiz_questions:[{...typedQuestions[2],expected_items:undefined}]},{...all,quizType:'enumeration'},section),StudyError);
+});
+test('Gemini schema permits the two choices required by true-or-false questions',async()=>{
+  const request={...base,contentType:'quiz',quizType:'true-false',quantity:1};
+  let sentSchema;
+  const result=await callGemini(section,request,{key:'test',fetcher:async(_url,options)=>{
+    sentSchema=JSON.parse(options.body).generationConfig.responseJsonSchema;
+    return response({quiz_questions:[typedQuestions[3]]});
+  }});
+  const choices=sentSchema.properties.quiz_questions.items.properties.choices;
+  assert.equal(choices.type,'array');
+  assert.equal(choices.minItems,undefined);
+  assert.equal(choices.maxItems,undefined);
+  assert.equal(result.quiz_questions[0].type,'true-false');
 });
 test('provider errors are safe, quota is not retried, transient retry is bounded',async()=>{
   for(const [status,code] of [[429,'QUOTA'],[403,'PROVIDER_CONFIGURATION'],[400,'PROVIDER_CONFIGURATION'],[404,'MODEL_UNAVAILABLE']]){
