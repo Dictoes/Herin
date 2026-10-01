@@ -371,6 +371,7 @@ body { -webkit-font-smoothing: antialiased; }
 
 @media (max-width: 1100px) {
  .topbar { flex-wrap: wrap; }
+ .topbar-heading { flex-basis: 100%; }
  .topbar-actions { max-width: 100%; }
  .dash-grid { grid-template-columns: minmax(0,1fr); }
  .week-scroll { display: none; }
