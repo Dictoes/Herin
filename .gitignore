@@ -6,3 +6,6 @@ test-results/
 playwright-report/
 supabase/.temp/
 supabase/.env*
+
+.vercel
+.env*
