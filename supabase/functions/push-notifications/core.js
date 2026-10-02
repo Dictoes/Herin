@@ -1,5 +1,5 @@
 // Shared, testable scheduling rules. All occurrence keys use UTC instants.
-export function dueNotifications(classes, reminders, timezone, lead, now = new Date()) {
+export function dueNotifications(classes, reminders, timezone, lead, now = new Date(), assignments = []) {
   const minutes = [5,10,15,20,30].includes(Number(lead)) ? Number(lead) : 15;
   let formatter;
   try { formatter = new Intl.DateTimeFormat('en-US',{timeZone:timezone,weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}); }
@@ -22,6 +22,18 @@ export function dueNotifications(classes, reminders, timezone, lead, now = new D
     const time = new Date(r.remind_at).getTime();
     if (r.is_completed || !Number.isFinite(time) || time > now.getTime() || time < now.getTime()-15*60000) continue;
     occurrences.push({key:`reminder:${r.id}:${new Date(time).toISOString()}`,title:r.title,body:'Your Herin reminder is due.',url:'/#/schedule',expiresAt:new Date(time+15*60000).toISOString()});
+  }
+  for (const assignment of assignments) {
+    const due = new Date(assignment.due_date).getTime();
+    const alertAt = due-minutes*60000;
+    if (assignment.status==='completed' || !Number.isFinite(due) || now.getTime()<alertAt || now.getTime()>=due) continue;
+    occurrences.push({
+      key:`assignment:${assignment.id}:${new Date(due).toISOString()}`,
+      title:assignment.title,
+      body:`Assignment due in ${Math.ceil((due-now.getTime())/60000)} minutes.`,
+      url:'/#/schedule',
+      expiresAt:new Date(due).toISOString()
+    });
   }
   return occurrences;
 }

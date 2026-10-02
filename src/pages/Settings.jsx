@@ -197,14 +197,14 @@ export default function Settings() {
       </div>
       <div className="card settings-section">
         <div className="section-title">
-          <Bell size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Class reminders
+          <Bell size={15} style={{ verticalAlign: -2, marginRight: 6 }} /> Reminders
         </div>
 
         <div className="settings-row">
           <div>
-            <div className="label">Remind me before class</div>
+            <div className="label">Remind me before class or assignment deadline</div>
             <div className="desc">
-              Enable class and saved reminders for your account. For alerts while Herin is closed, also enable background reminders on each device. Times follow your device time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.
+              Enable class, assignment, and saved reminders for your account. For alerts while Herin is closed, also enable background reminders on each device. Times follow your device time zone: {Intl.DateTimeFormat().resolvedOptions().timeZone}.
             </div>
           </div>
           <label className="switch">
@@ -221,7 +221,7 @@ export default function Settings() {
         <div className="settings-row">
           <div>
             <div className="label">Reminder time</div>
-            <div className="desc">How long before a class you'd like to be notified.</div>
+            <div className="desc">How long before a class or assignment deadline you'd like to be notified.</div>
           </div>
           <select
             className="select"

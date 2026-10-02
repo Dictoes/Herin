@@ -33,10 +33,10 @@ Deno.serve(async req=>{
     if(Date.now()-started>45000)break;
     if(!owners.has(device.user_id)){
      const pref=check(await db.from('user_preferences').select('push_notifications,data').eq('user_id',device.user_id).maybeSingle());
-     owners.set(device.user_id,pref?.push_notifications?{pref,classes:await all('classes','id,name,data,schedule_pattern',device.user_id),reminders:await all('reminders','id,title,remind_at,is_completed',device.user_id)}:null);
+     owners.set(device.user_id,pref?.push_notifications?{pref,classes:await all('classes','id,name,data,schedule_pattern',device.user_id),reminders:await all('reminders','id,title,remind_at,is_completed',device.user_id),assignments:await all('assignments','id,title,due_date,status',device.user_id)}:null);
     }
     const owner=owners.get(device.user_id);if(!owner)continue;
-    for(const item of dueNotifications(owner.classes,owner.reminders,device.timezone,owner.pref.data?.settings?.reminderMinutes)){
+    for(const item of dueNotifications(owner.classes,owner.reminders,device.timezone,owner.pref.data?.settings?.reminderMinutes,new Date(),owner.assignments)){
      if(Date.now()-started>45000)break;
      const claimed=check(await db.rpc('claim_push_delivery',{p_subscription:device.id,p_key:item.key}));if(!claimed)continue;
      try{
