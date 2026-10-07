@@ -4,6 +4,7 @@ import {Link} from 'react-router-dom';
 import {supabase} from '../lib/supabase';
 import {openCloud,closeCloud,flushCloud} from '../utils/cloudStore';
 import {disableBackgroundPush,restoreBackgroundPush,clearPushOwner} from '../utils/backgroundPush';
+import {PROFILE_PHOTO_BUCKET,validateProfilePhoto} from '../utils/profilePhoto';
 const AuthContext=createContext(null);
 export const useAuth=()=>useContext(AuthContext);
 export default function AuthProvider({children}) {
@@ -31,8 +32,18 @@ export default function AuthProvider({children}) {
     supabase.auth.getSession().then(({data,error})=>{if(error)setError(error.message);else if(!data.session)setReady(true);});
     return()=>{version.current++;data.subscription.unsubscribe();closeCloud();};
   },[retry]);
+  async function updateProfilePhoto(file) {
+    if (!session?.user) throw Error('Sign in to update your profile picture.');
+    validateProfilePhoto(file);
+    const path=`${session.user.id}/avatar`;
+    const {error:uploadError}=await supabase.storage.from(PROFILE_PHOTO_BUCKET).upload(path,file,{cacheControl:'3600',contentType:file.type,upsert:true});
+    if(uploadError)throw uploadError;
+    const {data,error:updateError}=await supabase.auth.updateUser({data:{...session.user.user_metadata,avatar_path:path}});
+    if(updateError)throw updateError;
+    setSession(current=>current?{...current,user:data.user}:current);
+  }
   async function logout() {await flushCloud();await disableBackgroundPush();const {error}=await supabase.auth.signOut();if(error)throw error;closeCloud();setSession(null);setReady(true);}
-  return <AuthContext.Provider value={{session,logout}}>
+  return <AuthContext.Provider value={{session,logout,updateProfilePhoto}}>
     {error?<main className="auth-shell"><section className="card auth-card"><h1>Workspace unavailable</h1><p role="alert">{error}</p><p>Check your connection and ensure the Herin database migration has been applied.</p><button className="btn btn-primary" onClick={()=>setRetry(n=>n+1)}>Retry</button>{session&&<button className="btn btn-secondary" onClick={()=>logout().then(()=>setError('')).catch(e=>setError(e.message))}>Log out</button>}</section></main>:passwordRecovery?<AuthForm recovery onRecoveryComplete={()=>setPasswordRecovery(false)}/>:!ready?<main className="auth-shell" role="status">Loading your workspace…</main>:session?<React.Fragment key={session.user.id}>{children}</React.Fragment>:<AuthForm/>}
   </AuthContext.Provider>;
 }

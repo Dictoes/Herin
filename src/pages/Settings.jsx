@@ -11,6 +11,7 @@ import { useApp } from '../context/AppContext';
 import { storage } from '../utils/storage';
 import { notificationsSupported, currentPermission } from '../utils/notifications';
 import { customThemeError, DEFAULT_CUSTOM_THEME, THEME_PRESETS } from '../utils/themePresets';
+import ProfileAvatar from '../components/common/ProfileAvatar';
 
 import {enableBackgroundPush,disableBackgroundPush,restoreBackgroundPush,backgroundPushSupported,testBackgroundPush} from '../utils/backgroundPush';
 import {flushCloud} from '../utils/cloudStore';
@@ -41,6 +42,8 @@ export default function Settings() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [pushEnabled,setPushEnabled]=useState(false),[pushBusy,setPushBusy]=useState(false),[pushError,setPushError]=useState('');
   const [previewTheme, setPreviewTheme] = useState(null);
+  const [profilePhotoBusy, setProfilePhotoBusy] = useState(false);
+  const profilePhotoInput = useRef(null);
   const previewSnapshot = useRef(null);
   const customTheme = { ...DEFAULT_CUSTOM_THEME, ...settings.customTheme };
   const customError = customThemeError(customTheme);
@@ -130,6 +133,21 @@ export default function Settings() {
     pushToast('Export downloaded.', 'success');
   }
 
+  async function handleProfilePhotoChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setProfilePhotoBusy(true);
+    try {
+      await auth.updateProfilePhoto(file);
+      pushToast('Profile picture updated.', 'success');
+    } catch (error) {
+      pushToast(error.message, 'error');
+    } finally {
+      setProfilePhotoBusy(false);
+      event.target.value = '';
+    }
+  }
+
   return (
     <AppLayout title="Settings" subtitle="Manage reminders and your data"><section className="card settings-section"><h2>Help & privacy</h2><SupportHerin/><p>Learn how to use Herin and how your information is handled.</p><div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a><a href="#/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a></div></section>
       {auth && <div className="card settings-section"><h2>Account</h2><div className="settings-row"><span>{auth.session?.user.email}</span><button className="btn btn-secondary" disabled={loggingOut} onClick={async()=>{setLoggingOut(true);try{await auth.logout();}catch(e){pushToast(e.message,'error');}finally{setLoggingOut(false);}}}>{loggingOut?'Saving and logging out...':'Log out'}</button></div></div>}
@@ -137,6 +155,14 @@ export default function Settings() {
       <div className="card settings-section"><h2>Install & offline access</h2><OfflineStatus details/><p>Enable background reminders below to receive alerts after closing Herin. On iPhone or iPad (iOS 16.4+), add Herin to your Home Screen, open it there, and allow notifications.</p></div>
       <div className="card settings-section" id="appearance">
         <div className="section-title">Appearance & profile</div>
+        {auth && <div className="settings-row profile-photo-row">
+          <div><div className="label">Profile picture</div><div className="desc">Choose a JPG, PNG, WebP, or GIF image up to 5 MB.</div></div>
+          <div className="profile-photo-control">
+            <ProfileAvatar displayName={settings.displayName} />
+            <input ref={profilePhotoInput} className="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" aria-label="Choose profile picture" onChange={handleProfilePhotoChange} />
+            <button className="btn btn-secondary" type="button" disabled={profilePhotoBusy} onClick={() => profilePhotoInput.current?.click()}>{profilePhotoBusy ? 'Uploading…' : 'Choose photo'}</button>
+          </div>
+        </div>}
         <div className="settings-row"><div><div className="label">Display name</div><div className="desc">Personalize your account across devices.</div></div><input className="input" aria-label="Display name" style={{maxWidth:220}} value={settings.displayName || ''} onChange={e => updateSettings({displayName:e.target.value})} /></div>
         <div className="settings-row"><div><div className="label">Color mode</div><div className="desc">Choose your reading environment.</div></div><select className="select" aria-label="Color mode" value={settings.mode || 'system'} onChange={e => updateSettings({mode:e.target.value})}><option value="light">Light</option><option value="dark">Dark</option><option value="system">Follow system</option></select></div>
         <div className="theme-gallery-heading">

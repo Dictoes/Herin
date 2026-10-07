@@ -3,6 +3,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, Menu, Moon, Palette, Plus, Settings as SettingsIcon, Sun } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../../context/AppContext';
+import ProfileAvatar from '../common/ProfileAvatar';
 import { THEME_PRESETS } from '../../utils/themePresets';
 import Sidebar from './Sidebar';
 import ToastStack from '../common/ToastStack';
@@ -126,6 +127,9 @@ export default function AppLayout({ title, subtitle, actions, children }) {
             </div>
             <button className="btn btn-ghost btn-icon" aria-label="Toggle light and dark mode" onClick={()=>updateSettings({mode: document.documentElement.dataset.mode === 'dark' ? 'light':'dark'})}>{settings.mode === 'dark' ? <Sun size={18}/> : <Moon size={18}/>}</button>
             <div className="quick-add"><button className="btn btn-secondary" aria-expanded={quickOpen} onClick={()=>setQuickOpen(!quickOpen)}><Plus size={16}/><span>Quick add</span></button>{quickOpen && <div className="quick-menu card"><button className="btn btn-ghost" onClick={()=>{navigate('/schedule?add=1');setQuickOpen(false);}}>Add class</button><button className="btn btn-ghost" onClick={()=>{navigate('/pdfs');setQuickOpen(false);}}>Import PDF</button><button className="btn btn-ghost" onClick={()=>{const id=addStandaloneNote();navigate(`/pdfs/${id}?notes=1`);setQuickOpen(false);}}>Write a note</button></div>}</div>
+            <button className="profile-avatar-trigger" type="button" aria-label="Open profile picture settings" title="Profile picture settings" onClick={() => navigate('/settings#appearance')}>
+              <ProfileAvatar displayName={settings.displayName} />
+            </button>
           </div>
         </header>
         <OfflineStatus/><main className="page-content">{children}</main>

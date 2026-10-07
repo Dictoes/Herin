@@ -159,6 +159,15 @@ grant select, insert, update, delete on public.reminders to authenticated;
 insert into storage.buckets(id,name,public,allowed_mime_types) values('herin-pdfs','herin-pdfs',false,array['application/pdf'])
 on conflict(id) do update set public=false, allowed_mime_types=excluded.allowed_mime_types;
 
+insert into storage.buckets(id,name,public,allowed_mime_types,file_size_limit)
+values('herin-profile-photos','herin-profile-photos',false,array['image/jpeg','image/png','image/webp','image/gif'],5242880)
+on conflict(id) do update set public=false, allowed_mime_types=excluded.allowed_mime_types, file_size_limit=excluded.file_size_limit;
+
+drop policy if exists herin_profile_photos_owner on storage.objects;
+create policy herin_profile_photos_owner on storage.objects for all to authenticated
+using (bucket_id='herin-profile-photos' and name=((select auth.uid())::text || '/avatar'))
+with check (bucket_id='herin-profile-photos' and name=((select auth.uid())::text || '/avatar'));
+
 drop policy if exists herin_pdfs_read on storage.objects;
 create policy herin_pdfs_read on storage.objects for select to authenticated
 using (bucket_id = 'herin-pdfs' and (select auth.uid())::text = (storage.foldername(name))[1]);
