@@ -45,7 +45,7 @@ export default function Sidebar({ open, onNavigate }) {
             </NavLink>
           </React.Fragment>)}
         </div>
-        <div className="sidebar-foot"><SupportHerin/>Your private study workspace.<div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a></div></div>
+        <div className="sidebar-foot"><SupportHerin/>Your private study workspace.<div className="help-links"><a href="#/guide" target="_blank" rel="noopener noreferrer">User guide</a><a href="#/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a><a href="#/terms" target="_blank" rel="noopener noreferrer">Terms of Use</a></div></div>
       </nav>
     </>
   );

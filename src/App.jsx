@@ -30,5 +30,5 @@ function Workspace() {
 }
 
 export default function App() {
-  return <HashRouter><Routes><Route path="/share/:shareId" element={<SharedStudy />} /><Route path="/guide" element={<InfoPage />} /><Route path="/privacy" element={<InfoPage privacy />} /><Route path="*" element={<Workspace />} /></Routes></HashRouter>;
+  return <HashRouter><Routes><Route path="/share/:shareId" element={<SharedStudy />} /><Route path="/guide" element={<InfoPage />} /><Route path="/privacy" element={<InfoPage privacy />} /><Route path="/terms" element={<InfoPage terms />} /><Route path="*" element={<Workspace />} /></Routes></HashRouter>;
 }

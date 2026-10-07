@@ -4,6 +4,7 @@ import App from './App';
 import './styles/global.css';
 import './styles/study.css';
 import './styles/interface.css';
+import './styles/auth.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
