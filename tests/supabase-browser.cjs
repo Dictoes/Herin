@@ -127,7 +127,7 @@ await page.getByLabel('Email',{exact:true}).fill(user.email);await page.getByLab
 await page.getByRole('button',{name:'Log in',exact:true}).click();await page.getByRole('button',{name:'Log in',exact:true}).click();await page.locator('.topbar-title').waitFor();
 await navigate('ask');await page.getByRole('heading',{name:'Ask about your material',exact:true}).waitFor();await page.getByRole('img',{name:'Yuki study companion'}).waitFor();await page.getByRole('textbox',{name:'Ask a question about your study material'}).waitFor();assert.equal(await page.getByRole('button',{name:'Send question'}).isDisabled(),true);
 if(process.env.HERIN_DESIGN_TEST==='1'){
- for(const route of ['','schedule','pdfs','notes','flashcards','quiz']){await navigate(route);await design(page,'empty-'+(route||'dashboard'));}
+ for(const route of ['','schedule','pdfs','notes','ask','flashcards','quiz']){await navigate(route);await design(page,'empty-'+(route||'dashboard'));}
 }
 await navigate('pdfs');await page.locator('input[type=file]').setInputFiles(path.join(__dirname,'fixtures/Biology-course.pdf'));
 await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);assert.equal(tables.pdfs[0].data.status,'ready',JSON.stringify(tables.pdfs[0].data));assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
@@ -171,7 +171,7 @@ await navigate('settings');await page.locator('.theme-card').filter({hasText:'Pl
 if(process.env.HERIN_DESIGN_TEST==='1'){
  tables.pdfs[0].data.subject='Biology';
  await page.reload();await page.locator('.topbar-title').waitFor();
- for(const route of ['','schedule','pdfs','notes','flashcards','quiz','settings','pdfs/'+tables.pdfs[0].data.id]){await navigate(route);await design(page,'populated-'+(route.replace('/','-')||'dashboard'));}
+ for(const route of ['','schedule','pdfs','notes','ask','flashcards','quiz','settings','pdfs/'+tables.pdfs[0].data.id]){await navigate(route);await design(page,'populated-'+(route.replace('/','-')||'dashboard'));}
  await navigate('schedule');await page.getByRole('button',{name:'Add class',exact:true}).first().click();await design(page,'class-form');await page.getByRole('button',{name:'Close dialog'}).click();
  await navigate('flashcards');await page.getByRole('button',{name:'Edit flashcard',exact:true}).click();await design(page,'flashcard-form');await page.getByRole('button',{name:'Close dialog'}).click();
  await page.getByRole('button',{name:'Delete flashcard',exact:true}).click();await design(page,'confirm-delete');await page.getByRole('button',{name:'Cancel',exact:true}).click();

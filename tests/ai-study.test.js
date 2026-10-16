@@ -19,8 +19,8 @@ const output={flashcards:[card],quiz_questions:[quiz]};
 const response=data=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(data)}]}}]}));
 test('Yuki states map to the supplied six atlas rows',()=>{
   const sprite=readFileSync(new URL('../public/yuki-study-helper.png',import.meta.url));
-  assert.equal(sprite.readUInt32BE(16),768);
-  assert.equal(sprite.readUInt32BE(20),1152);
+  assert.equal(sprite.readUInt32BE(16),1024);
+  assert.equal(sprite.readUInt32BE(20),1536);
   assert.equal(sprite.readUInt32BE(16)/4,sprite.readUInt32BE(20)/6);
   assert.deepEqual(YUKI_ROWS,{idle:0,welcome:1,notes:2,thinking:3,explaining:3,quizWrong:4,quizCorrect:5});
 });

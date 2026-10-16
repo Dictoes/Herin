@@ -1,20 +1,21 @@
 .yuki {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex: 0 0 auto;
-  width: 44px;
-  height: 44px;
-  background-image: var(--yuki-image);
-  background-repeat: no-repeat;
-  background-size: 400% 600%;
-  background-position: calc(var(--yuki-frame, 0) * 33.3333%) calc(var(--yuki-row, 0) * 20%);
+  width: 56px;
+  height: 56px;
   image-rendering: auto;
+  border-radius: 10px;
 }
+.yuki-frame { display: block; flex: none; background-repeat: no-repeat; }
 
-.yuki--avatar { width: 32px; height: 32px; }
-.yuki--medium { width: 112px; height: 112px; }
-.yuki[data-state='idle'] { animation: yuki-idle 2.8s steps(3, end) infinite; }
+.yuki--avatar { width: 48px; height: 48px; }
+.yuki--medium { width: 168px; height: 168px; border-radius: 18px; }
+.yuki[data-state='idle'] .yuki-frame { animation: yuki-idle 8s step-end infinite; }
 @keyframes yuki-idle {
-  to { background-position: 100% 0; }
+  0%, 90% { background-position: 0 0; }
+  82% { background-position: 33.3333% 0; }
 }
 
 .ask-herin-page {
@@ -32,7 +33,7 @@
   align-items: flex-end;
   gap: 20px;
 }
-.ask-herin-header h2 { margin: 6px 0; font-size: clamp(28px, 4vw, 38px); }
+.ask-herin-header h2 { margin: 6px 0; font-size: clamp(21px, 3vw, 28px); font-weight: 600; letter-spacing: -.025em; }
 .ask-herin-header > div > p { max-width: 600px; color: var(--ink-soft); }
 .ask-herin-eyebrow {
   display: inline-flex;
@@ -104,18 +105,19 @@
   display: flex;
   flex: 1;
   min-height: 420px;
+  height: min(760px, calc(100dvh - 320px));
+  flex: none;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
 }
 .ask-herin-messages {
   display: flex;
   flex: 1;
-  min-height: 300px;
-  max-height: min(64vh, 720px);
+  min-height: 0;
   flex-direction: column;
   gap: 18px;
   overflow-y: auto;
@@ -125,20 +127,25 @@
 .ask-herin-messages.has-messages { align-items: stretch; }
 .ask-herin-welcome {
   display: flex;
-  flex: 1;
+  flex: 0 0 auto;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: clamp(18px, 4vw, 42px);
+  gap: 16px;
+  width: 100%;
+  text-align: center;
   max-width: 760px;
   margin: auto;
 }
-.ask-herin-welcome .yuki { align-self: center; }
-.ask-herin-welcome-copy { max-width: 540px; }
-.ask-herin-kicker { color: var(--accent-mint); font-size: 14px; font-weight: 650; }
-.ask-herin-welcome h2 { margin: 2px 0 8px; font-size: clamp(23px, 3vw, 31px); }
+.ask-herin-welcome .yuki { align-self: center; width: 220px; height: 220px; }
+.ask-herin-welcome-copy { width: 100%; max-width: 540px; }
+.ask-herin-chat:has(.ask-herin-welcome) { height: auto; }
+.ask-herin-kicker { color: var(--ink-soft); font-size: 14px; font-weight: 650; }
+.ask-herin-welcome h2 { margin: 6px 0 12px; font-size: clamp(23px, 3vw, 30px); font-weight: 600; letter-spacing: -.03em; line-height: 1.2; }
 .ask-herin-welcome-copy > p:not(.ask-herin-kicker) { color: var(--ink-soft); }
 .ask-herin-selected-source { margin-top: 10px; font-size: 13px; }
-.ask-herin-suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+.ask-herin-suggestions { display: grid; gap: 8px; margin-top: 20px; }
+.ask-herin-suggestions button { text-align: left; border-radius: 9px; padding: 12px 14px; }
 .ask-herin-suggestions button, .ask-herin-actions button {
   padding: 7px 11px;
   border: 1px solid var(--border);
@@ -149,6 +156,8 @@
   cursor: pointer;
 }
 .ask-herin-suggestions button:hover, .ask-herin-actions button:hover { border-color: var(--accent-mint); color: var(--ink); }
+.ask-herin-suggestions button { border-radius: 9px; padding: 12px 14px; }
+.ask-herin-actions button:disabled { opacity: .5; cursor: not-allowed; }
 
 .ask-herin-message { display: flex; align-items: flex-start; gap: 9px; max-width: 86%; }
 .ask-herin-message--user { align-self: flex-end; justify-content: flex-end; }
@@ -168,7 +177,7 @@
 .ask-herin-citations { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--ink-soft); font-size: 12px; }
 .ask-herin-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
 .ask-herin-actions button { padding: 6px 9px; font-size: 12px; }
-.ask-herin-thinking { display: flex; align-items: center; gap: 9px; color: var(--ink-soft); font-size: 14px; }
+.ask-herin-thinking { display: flex; align-items: center; align-self: flex-start; gap: 12px; padding: 12px; border-radius: 12px; background: var(--surface-sunken); color: var(--ink-soft); font-size: 14px; }
 .ask-herin-thinking-dots { animation: ask-dots 1.2s steps(3, end) infinite; }
 @keyframes ask-dots { 0% { opacity: .25; } 50% { opacity: 1; } 100% { opacity: .25; } }
 .ask-herin-error {
@@ -202,6 +211,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   background: var(--surface-raised);
+  flex-shrink: 0;
 }
 .ask-herin-composer:focus-within { border-color: var(--accent-mint); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-mint) 20%, transparent); }
 .ask-herin-composer textarea {
@@ -245,30 +255,46 @@
 .yuki-note-tip p { flex: 1; color: var(--ink-soft); font-size: 14px; }
 .yuki-note-tip strong { margin-right: 6px; color: var(--ink); }
 .yuki-note-tip a { color: var(--primary); font-weight: 600; white-space: nowrap; }
-.quiz-yuki-response { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.quiz-yuki-response { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 18px; text-align: center; }
+.quiz-yuki-response .yuki { width: 180px; height: 180px; }
 .quiz-yuki-response h3 { margin-bottom: 3px; }
 .quiz-yuki-response p { line-height: 1.5; }
+.quiz-review-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
+.quiz-review-heading label { display: flex; align-items: center; gap: 8px; }
+.quiz-review-list { padding-left: 24px; margin: 0; }
+.quiz-review-item { padding: 20px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.quiz-review-item h4 { margin: 10px 0; font-size: 16px; }
+.quiz-review-item p { margin: 8px 0; white-space: pre-wrap; }
+.quiz-review-item a { color: var(--primary); }
+.quiz-review-dropdown { margin-top: 16px; border-top: 1px solid var(--border); }
+.quiz-review-dropdown > summary { padding: 16px 0; cursor: pointer; font-weight: 600; }
+.quiz-review-dropdown > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.quiz-review-dropdown .quiz-review-heading { margin: 0 0 16px; }
+.quiz-back-top { margin-top: 12px; }
 
 @media (max-width: 680px) {
   .ask-herin-page { min-height: calc(100dvh - 80px); gap: 14px; }
   .ask-herin-header { align-items: flex-start; flex-direction: column; gap: 12px; }
   .ask-herin-source { width: 100%; }
-  .ask-herin-chat { min-height: 58dvh; }
-  .ask-herin-messages { max-height: none; min-height: 240px; padding: 18px 14px; }
-  .ask-herin-welcome { align-items: flex-start; gap: 14px; }
-  .yuki--medium { width: 76px; height: 76px; }
+  .ask-herin-header > div { display: none; }
+  .ask-herin-chat { height: calc(100dvh - 300px); min-height: 360px; }
+  .ask-herin-messages { padding: 18px 14px; }
+  .ask-herin-welcome { align-items: center; gap: 14px; }
+  .ask-herin-welcome .yuki { width: 168px; height: 168px; }
+  .quiz-yuki-response .yuki { width: 144px; height: 144px; }
+  .yuki--medium { width: 108px; height: 108px; }
   .ask-herin-message { max-width: 96%; }
   .ask-herin-composer { margin-inline: 10px; }
   .ask-herin-error { align-items: flex-start; }
+  .ask-herin-footnote { font-size: 11px; padding: 8px 14px 12px; }
   .yuki-note-tip { align-items: flex-start; }
 }
 
 @media (max-width: 390px) {
   .ask-herin-welcome { flex-direction: column; }
-  .ask-herin-welcome .yuki { align-self: flex-start; }
   .yuki-note-tip { flex-wrap: wrap; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .yuki[data-state='idle'], .ask-herin-thinking-dots { animation: none; }
+  .yuki[data-state='idle'] .yuki-frame, .ask-herin-thinking-dots { animation: none; }
 }

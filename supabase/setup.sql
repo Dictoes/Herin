@@ -3,7 +3,7 @@
 begin;
 
 create table if not exists public.profiles (
-  id uuid primary key default gen_random_uuid(), user_id uuid not null unique references auth.users(id) on delete cascade, display_name text, avatar_url text,
+  id uuid primary key default gen_random_uuid(), user_id uuid not null unique references auth.users(id) on delete cascade, display_name text,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
 
@@ -158,15 +158,6 @@ grant select, insert, update, delete on public.reminders to authenticated;
 
 insert into storage.buckets(id,name,public,allowed_mime_types) values('herin-pdfs','herin-pdfs',false,array['application/pdf'])
 on conflict(id) do update set public=false, allowed_mime_types=excluded.allowed_mime_types;
-
-insert into storage.buckets(id,name,public,allowed_mime_types,file_size_limit)
-values('herin-profile-photos','herin-profile-photos',false,array['image/jpeg','image/png','image/webp','image/gif'],5242880)
-on conflict(id) do update set public=false, allowed_mime_types=excluded.allowed_mime_types, file_size_limit=excluded.file_size_limit;
-
-drop policy if exists herin_profile_photos_owner on storage.objects;
-create policy herin_profile_photos_owner on storage.objects for all to authenticated
-using (bucket_id='herin-profile-photos' and name=((select auth.uid())::text || '/avatar'))
-with check (bucket_id='herin-profile-photos' and name=((select auth.uid())::text || '/avatar'));
 
 drop policy if exists herin_pdfs_read on storage.objects;
 create policy herin_pdfs_read on storage.objects for select to authenticated

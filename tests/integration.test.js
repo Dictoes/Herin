@@ -91,4 +91,24 @@ test('15-minute reminder records the occurrence and does not repeat after remoun
  stop=await mount(root);assert.ok(!app().toasts.some(t=>t.message.includes('starts in 15 min')));await stop();
  storage.setSettings({...storage.getSettings(),notificationsEnabled:false});
 });
+test('bulk quiz deletion confirms the generation scope and survives immediate remount',async()=>{
+ const original=storage.getStudy();
+ const question=(id,generationId,type='identification',pdfId='p1')=>({id,generationId,type,pdfId,question:'Question '+id,correctAnswer:'Answer',explanation:'Source explanation'});
+ storage.setStudy({...original,quizQuestions:[question('delete-a','batch-a'),question('delete-b','batch-a','application'),question('keep-b','batch-b'),question('keep-other','batch-a','identification','p2')]});
+ storage.setQuizSession({source:'p1',type:'identification',index:0});
+ const beforeNotes=JSON.stringify(storage.getNotes()),beforePdfs=JSON.stringify(storage.getPdfs());
+ let stop=await mount(root,'/quiz');
+ const button=text=>[...root.querySelectorAll('button')].find(b=>b.textContent===text);
+ await click(button('Delete generated set'));
+ assert.match(root.querySelector('[role=dialog]').textContent,/all 2 questions/);
+ await click(button('Cancel'));assert.equal(storage.getStudy().quizQuestions.length,4);
+ await click(button('Delete generated set'));await click(button('Delete 2 questions'));
+ assert.deepEqual(storage.getStudy().quizQuestions.map(q=>q.id),['keep-b','keep-other']);
+ assert.deepEqual(storage.getStudy().flashcards,original.flashcards);
+ assert.equal(JSON.stringify(storage.getNotes()),beforeNotes);assert.equal(JSON.stringify(storage.getPdfs()),beforePdfs);
+ await stop();stop=await mount(root,'/quiz');
+ assert.match(root.textContent,/Question keep-b/);assert.equal(storage.getQuizSession().index,0);
+ await stop();storage.setStudy(original);
+});
+
 test.after(async()=>{dom.window.close();await unlink(bundle);await unlink(new URL('./.integration-runtime.css',import.meta.url)).catch(()=>{});});

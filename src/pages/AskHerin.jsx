@@ -5,6 +5,7 @@ import AppLayout from '../components/Layout/AppLayout';
 import {useApp} from '../context/AppContext';
 import Yuki from '../components/common/Yuki';
 import {buildAskContext} from '../utils/askHerinContext';
+import {buildAskRequest} from '../utils/askHerinRequest';
 import {supabase} from '../lib/supabase';
 
 const QUICK_PROMPTS = [
@@ -26,6 +27,8 @@ export default function AskHerin() {
   const [status,setStatus] = useState('idle');
   const [error,setError] = useState('');
   const listRef = useRef(null);
+  const requestRef = useRef(false);
+  const retryRef = useRef(null);
   const inputRef = useRef(null);
   const busy = status === 'loading';
   const pdfs = app.pdfs || [];
@@ -64,33 +67,41 @@ export default function AskHerin() {
 
   const sendQuestion = useCallback(async (question, retry = false) => {
     const cleanQuestion = question.trim();
-    if (!cleanQuestion || busy) return;
+    if (!cleanQuestion || busy || requestRef.current) return;
+    requestRef.current = true;
     const previous = retry ? messages.slice(0,-1) : messages;
     const next = retry ? messages : [...messages,{role:'user',text:cleanQuestion}];
-    const context = contextFor(cleanQuestion);
+    const body = retry && retryRef.current ? retryRef.current : buildAskRequest({question:cleanQuestion,history:previous,context:contextFor(cleanQuestion)});
+    const context = body.context;
+    retryRef.current = body;
     setMessages(next);
     setInput('');
     setError('');
     setStatus('loading');
     try {
       const {data,error:invokeError} = await supabase.functions.invoke('generate-study-content',{
-        body:{action:'ask',question:cleanQuestion,history:previous.slice(-8),context},
+        body,
       });
-      if (invokeError) throw invokeError;
+      if (invokeError) {
+        const detail = await invokeError.context?.json?.().catch(() => null);
+        throw new Error(detail?.message || detail?.error || invokeError.message);
+      }
       if (!data?.success || typeof data.answer !== 'string' || !Array.isArray(data.sourcePages)) {
         throw new Error('Herin could not return a complete answer. Please retry.');
       }
-      setMessages([...next,{role:'assistant',text:data.answer,sourcePages:data.sourcePages}]);
+      setMessages([...next,{role:'assistant',text:data.answer,sourcePages:data.sourcePages.filter(page => context.some(source => source.page === page)),pdfId,excerptCount:context.length}]);
       setStatus('idle');
     } catch (cause) {
       setError(cause?.message || 'Something went wrong while asking Herin.');
       setStatus('error');
+    } finally {
+      requestRef.current = false;
     }
-  },[contextFor,busy,messages]);
+  },[contextFor,busy,messages,pdfId]);
 
   const lastQuestion = useMemo(() => [...messages].reverse().find(item => item.role === 'user')?.text || '',[messages]);
 
-  function useQuickAction(action) {
+  function useQuickAction(action, messageIndex) {
     if (action === 'flashcards' || action === 'quiz') {
       if (!currentPdf) {
         setError('Choose a PDF first to create study material.');
@@ -99,12 +110,13 @@ export default function AskHerin() {
       navigate(`/pdfs/${encodeURIComponent(currentPdf.id)}?generate=${action}#ai-herin-assistant`);
       return;
     }
-    if (!lastQuestion) return;
+    const targetQuestion = [...messages.slice(0,messageIndex)].reverse().find(item => item.role === 'user')?.text || lastQuestion;
+    if (!targetQuestion) return;
     const lastAnswer = [...messages].reverse().find(item => item.role === 'assistant')?.text || '';
     if (action === 'simplify' && lastAnswer) {
-      void sendQuestion(`Explain this more simply, using the provided study material: ${lastQuestion}`);
+      void sendQuestion(`Explain this more simply, using the provided study material: ${targetQuestion}`);
     } else if (action === 'summarize') {
-      void sendQuestion(`Summarize the relevant material about: ${lastQuestion}`);
+      void sendQuestion(`Summarize the relevant material about: ${targetQuestion}`);
     }
   }
 
@@ -120,9 +132,9 @@ export default function AskHerin() {
         {pdfs.length > 0 && (
           <label className="ask-herin-source">
             <BookOpen size={17} aria-hidden="true" />
-            <span className="sr-only">Select study PDF</span>
-            <select value={pdfId} onChange={event => setPdfId(event.target.value)}>
-              <option value="">No PDF selected</option>
+            <span className="sr-only">Select study material</span>
+            <select disabled={busy} value={pdfId} onChange={event => {setPdfId(event.target.value); setMessages([]); setStatus('idle'); setError(''); retryRef.current = null;}}>
+              <option value="">Choose a PDF or note</option>
               {pdfs.map(pdf => <option key={pdf.id} value={pdf.id}>{pdf.title || pdf.name || 'Untitled PDF'}</option>)}
             </select>
           </label>
@@ -140,6 +152,7 @@ export default function AskHerin() {
                 key={highlight.id}
                 type="button"
                 aria-pressed={checked}
+                disabled={busy}
                 onClick={() => setSelectedHighlightIds(current => {
                   const updated = new Set(current);
                   checked ? updated.delete(highlight.id) : updated.add(highlight.id);
@@ -160,12 +173,12 @@ export default function AskHerin() {
             <div className="ask-herin-welcome">
               <Yuki state="welcome" size="medium" />
               <div className="ask-herin-welcome-copy">
-                <p className="ask-herin-kicker">Hi, I’m Herin</p>
-                <h2>Let’s make this click.</h2>
+                <p className="ask-herin-kicker">Hi, I’m Yuki.</p>
+                <h2>A little clarity, one question at a time.</h2>
                 <p>Ask about a concept in your material. If a detail isn’t in the sources, I’ll tell you.</p>
-                {pdfId && <p className="ask-herin-selected-source">Using {currentPdf?.title || currentPdf?.name || 'selected PDF'}, relevant notes{selectedHighlightIds.size ? ', and selected highlights' : ''}.</p>}
+                {pdfId && <p className="ask-herin-selected-source">Using excerpts from {currentPdf?.title || currentPdf?.name || 'selected PDF'}, relevant notes{selectedHighlightIds.size ? ', and selected highlights' : ''}.</p>}
                 <div className="ask-herin-suggestions" aria-label="Suggested questions">
-                  {QUICK_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => setInput(prompt)}>{prompt}</button>)}
+                  {QUICK_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => {setInput(prompt); inputRef.current?.focus();}}>{prompt}</button>)}
                 </div>
               </div>
             </div>
@@ -173,22 +186,23 @@ export default function AskHerin() {
             messages.map((message,index) => <article className={`ask-herin-message ask-herin-message--${message.role}`} key={`${index}-${message.role}`}>
               {message.role === 'assistant' && <Yuki state="explaining" size="avatar" />}
               <div className="ask-herin-bubble">
+                {message.role === 'assistant' && <p className="ask-herin-grounding field-hint">{message.excerptCount ? `Based on ${message.excerptCount} selected excerpts, not a complete-document review.` : 'No supporting study excerpts were supplied.'}</p>}
                 <p>{message.text}</p>
                 {message.role === 'assistant' && message.sourcePages?.length > 0 && (
                   <p className="ask-herin-citations">Source pages: {message.sourcePages.join(', ')}</p>
                 )}
                 {message.role === 'assistant' && <div className="ask-herin-actions" aria-label="Study actions">
-                  <button type="button" onClick={() => useQuickAction('simplify')}>Explain more simply</button>
-                  <button type="button" onClick={() => useQuickAction('summarize')}>Summarize</button>
+                  <button disabled={busy || message.pdfId !== pdfId} type="button" onClick={() => useQuickAction('simplify',index)}>Explain more simply</button>
+                  <button disabled={busy} type="button" onClick={() => useQuickAction('summarize',index)}>Summarize</button>
                   {currentPdf && <>
-                    <button type="button" onClick={() => useQuickAction('quiz')}>Make practice questions</button>
-                    <button type="button" onClick={() => useQuickAction('flashcards')}>Create flashcards</button>
+                    <button disabled={busy} type="button" onClick={() => useQuickAction('quiz')}>Make practice questions</button>
+                    <button disabled={busy} type="button" onClick={() => useQuickAction('flashcards')}>Create flashcards</button>
                   </>}
                 </div>}
               </div>
             </article>)
           )}
-          {busy && <div className="ask-herin-thinking"><Yuki state="thinking" size="avatar" /><span>Herin is thinking</span><span className="ask-herin-thinking-dots" aria-hidden="true">…</span></div>}
+          {busy && <div className="ask-herin-thinking" role="status"><Yuki state="thinking" size="avatar" /><span>Yuki is thinking</span><span className="ask-herin-thinking-dots" aria-hidden="true">…</span></div>}
           {status === 'error' && <div className="ask-herin-error" role="alert">
             <span>{error}</span>
             <button type="button" onClick={() => void sendQuestion(messages[messages.length - 1]?.text || '',true)}><RotateCw size={15} aria-hidden="true" /> Retry</button>
@@ -202,12 +216,12 @@ export default function AskHerin() {
             value={input}
             onChange={event => setInput(event.target.value)}
             onKeyDown={event => {
-              if (event.key === 'Enter' && !event.shiftKey) {
+              if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 void sendQuestion(input);
               }
             }}
-            placeholder={pdfId ? 'Ask about a concept, note, or selected highlight…' : 'Select a PDF to ask about it, or ask Herin a general question…'}
+            placeholder={pdfId ? 'Ask about a concept, note, or selected highlight…' : 'Choose a PDF or note, then ask a question…'}
             rows={2}
             maxLength={2000}
             disabled={busy}
@@ -215,9 +229,10 @@ export default function AskHerin() {
           {input && <button className="ask-herin-clear" type="button" aria-label="Clear question" onClick={() => setInput('')}><X size={16} aria-hidden="true" /></button>}
           <button className="ask-herin-send" type="submit" disabled={busy || !input.trim()} aria-label="Send question"><ArrowUp size={19} aria-hidden="true" /></button>
         </form>
-        <p className="ask-herin-footnote">{pdfId ? 'Relevant text from the selected PDF, notes, and selected highlights may be sent securely for an answer.' : 'No document context is sent until you select a PDF.'}</p>
+        <p className="ask-herin-footnote">{pdfId ? 'Herin searches all available extracted PDF text and sends selected excerpts, notes, and highlights for each question. Broad answers are an overview, not a full-document summary.' : 'Choose a PDF or note to supply context. Answers need supporting study material.'}</p>
       </section>
       {currentPdf && <Link className="ask-herin-pdf-link" to={`/pdfs/${encodeURIComponent(currentPdf.id)}`}>Open {currentPdf.title || 'selected PDF'}</Link>}
+      {currentPdf && currentPdf.kind !== 'note' && <p className="field-hint">For a full-PDF summary, open the PDF, choose “Entire PDF” in AI Herin Assistant, then “Summarize topic”. That workflow processes readable pages in sections.</p>}
     </div>
     </AppLayout>
   );

@@ -1,3 +1,4 @@
+import QuizResults from '../components/common/QuizResults';
 import ShareStudyButton from '../components/common/ShareStudyButton';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -18,20 +19,27 @@ import Yuki from '../components/common/Yuki';
 
 const labels = quizTypeLabels;
 export default function Quiz() {
-  const { quizQuestions, pdfs,updateQuizQuestion,deleteQuizQuestion } = useApp();
+  const { quizQuestions, pdfs,updateQuizQuestion,deleteQuizQuestion,deleteQuizQuestions } = useApp();
   const [editing,setEditing]=useState(null),[deleting,setDeleting]=useState(null);
+  const [deletingSet,setDeletingSet]=useState(null),[deleteError,setDeleteError]=useState('');
   const [session,setSession] = usePersistedState(storage.getQuizSession,storage.setQuizSession);
   const [params]=useSearchParams();
   const [saveError,setSaveError]=useState(''),[history,setHistory]=useState([]),[saving,setSaving]=useState(false);
-  useEffect(()=>{const pdf=params.get('pdf');if(pdf&&session.source!==pdf)setSession(p=>({...p,source:pdf,index:0,answer:'',status:null,score:0,answers:{},attemptId:crypto.randomUUID(),historySaved:false}));},[params.get('pdf')]);
+  useEffect(()=>{const pdf=params.get('pdf');if(pdf&&session.source!==pdf)setSession(p=>({...p,source:pdf,index:0,answer:'',status:null,score:0,answers:{},responses:{},attemptId:crypto.randomUUID(),historySaved:false}));},[params.get('pdf')]);
   const {source='',type='',index=0,answer='',status=null,score=0}=session;
   const setAnswer=answer=>setSession(p=>({...p,answer}));
   const questions=quizQuestions.filter(q=>(!source||q.pdfId===source)&&(!type||q.type===type));
   const signature=questions.map(q=>q.id+q.question+q.correctAnswer).join('|');
-  useEffect(()=>{if(session.signature!==signature)setSession(p=>({...p,signature,index:0,answer:'',status:null,score:0,answers:{},attemptId:crypto.randomUUID(),historySaved:false}));},[signature]);
-  const reset=()=>setSession(p=>({...p,index:0,answer:'',status:null,score:0,answers:{},attemptId:crypto.randomUUID(),historySaved:false}));
+  useEffect(()=>{if(session.signature!==signature)setSession(p=>({...p,signature,index:0,answer:'',status:null,score:0,answers:{},responses:{},attemptId:crypto.randomUUID(),historySaved:false}));},[signature]);
+  const reset=()=>setSession(p=>({...p,index:0,answer:'',status:null,score:0,answers:{},responses:{},attemptId:crypto.randomUUID(),historySaved:false}));
   const q=questions[index];
-  function check(val){if(status!==null||!q)return;const correct=checkQuizAnswer(q,val);setSession(p=>({...p,answer:val,status:correct?'correct':'incorrect',score:p.score+(correct?1:0),answers:{...p.answers,[q.id]:correct}}));}
+  const hasGeneratedSet=!!(q?.generationId || q?.cloudQuizId);
+  function confirmDeleteSet(){
+    const selected=hasGeneratedSet ? quizQuestions.filter(item=>item.pdfId===q.pdfId && (q.generationId ? item.generationId===q.generationId : item.cloudQuizId===q.cloudQuizId)) : questions;
+    setDeleteError('');
+    setDeletingSet({ids:selected.map(item=>item.id),generated:hasGeneratedSet});
+  }
+  function check(val){if(status!==null||!q)return;const correct=checkQuizAnswer(q,val);setSession(p=>({...p,answer:val,status:correct?'correct':'incorrect',score:p.score+(correct?1:0),answers:{...p.answers,[q.id]:correct},responses:{...p.responses,[q.id]:val}}));}
   async function saveHistory(){
     if(saving||session.historySaved)return;
     const groups=new Map();
@@ -56,13 +64,14 @@ export default function Quiz() {
   },[signature]);
   return <AppLayout title="Quiz practice" subtitle="Recall, check, and build your understanding">
     <div className="toolbar"><select className="select source-filter" aria-label="Quiz document" value={source} onChange={e=>{setSession(p=>({...p,source:e.target.value,index:0,answer:'',status:null,score:0}));}}><option value="">All documents</option>{pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><select className="select source-filter" aria-label="Question type" value={type||'all'} onChange={e=>{setSession(p=>({...p,type:e.target.value==='all'?'':e.target.value,index:0,answer:'',status:null,score:0}));}}>{quizTypeOptions.map(({value,label})=><option key={value} value={value}>{label}</option>)}</select></div>
-    {!questions.length ? <EmptyState icon={ListChecks} title="No questions in this selection" description="Highlight a complete lesson idea in a PDF or select another question type. Multiple choice needs distinct terms; enumeration needs a list in the source." action={<Link className="btn btn-primary" to="/pdfs">My PDFs</Link>}/> : !q ? <section className="card quiz-card"><span className="badge badge-live">Session complete</span><h2>{score} of {questions.length} correct</h2><p>Review the source for anything you missed.</p><button className="btn btn-primary" onClick={reset}>Practice again</button></section> : <section className="card quiz-card">
+    {!questions.length ? <EmptyState icon={ListChecks} title="No questions in this selection" description="Highlight a complete lesson idea in a PDF or select another question type. Multiple choice needs distinct terms; enumeration needs a list in the source." action={<Link className="btn btn-primary" to="/pdfs">My PDFs</Link>}/> : !q ? <QuizResults questions={questions} session={session} onReset={reset}/> : <section className="card quiz-card">
       <div className="quiz-progress"><span>Question {index+1} of {questions.length}</span><span>{score} correct</span></div><progress value={index} max={questions.length} aria-label="Quiz progress"/>
       <div className="study-card-meta"><span className="badge badge-info">{labels[q.type] || q.type}</span><span>Page {q.sourcePage || '-'}</span>{q.pdfId && <Link to={`/pdfs/${q.pdfId}?page=${q.sourcePage||1}`}>Source</Link>}</div>
-      <ShareStudyButton source={{kind:'quiz',id:q.cloudQuizId||'quiz:'+q.pdfId,item:q.id}} title={pdfs.find(p=>p.id===q.pdfId)?.name||'Quiz question'} subject={q.subject||pdfs.find(p=>p.id===q.pdfId)?.subject||''} quizzes={[q]}/><h2>{q.question}</h2><div className="note-actions"><button className="btn btn-ghost btn-sm" onClick={()=>setEditing({...q})}>Edit question</button><button className="btn btn-ghost btn-sm" onClick={()=>setDeleting(q)}>Delete question</button></div>
+      <ShareStudyButton source={{kind:'quiz',id:q.cloudQuizId||'quiz:'+q.pdfId,item:q.id}} title={pdfs.find(p=>p.id===q.pdfId)?.name||'Quiz question'} subject={q.subject||pdfs.find(p=>p.id===q.pdfId)?.subject||''} quizzes={[q]}/><h2>{q.question}</h2><div className="note-actions"><button className="btn btn-ghost btn-sm" onClick={()=>setEditing({...q})}>Edit question</button><button className="btn btn-ghost btn-sm" onClick={()=>setDeleting(q)}>Delete question</button><button className="btn btn-ghost btn-sm" onClick={confirmDeleteSet}>{hasGeneratedSet?'Delete generated set':'Delete selected questions'}</button></div>
       {(q.type === 'multiple' || q.type === 'true-false') ? <div className="quiz-options">{q.options.map((opt,i)=><button key={i} className={`btn btn-secondary ${status !== null && opt===q.correctAnswer ? 'answer-correct' : ''} ${status==='incorrect' && opt===answer ? 'answer-incorrect' : ''}`} disabled={status!==null} onClick={()=>check(opt)}><span className="option-letter">{String.fromCharCode(65+i)}</span>{opt}</button>)}</div> : <form onSubmit={e=>{e.preventDefault();check(answer);}}><label className="field" htmlFor="quiz-answer">{q.type==='enumeration'?'List the items, separated by semicolons':'Your answer'}</label><textarea id="quiz-answer" className="textarea" value={answer} onChange={e=>setAnswer(e.target.value)} disabled={status!==null} rows={3}/>{status===null && <button className="btn btn-primary" disabled={!answer.trim()}>Check answer</button>}</form>}
       {status!==null && <div className={`quiz-feedback ${status}`} role="status"><div className="quiz-yuki-response"><Yuki key={`${q.id}-${status}`} state={status==='correct'?'quizCorrect':'quizWrong'} size="small"/><div><h3>{status==='correct'?'Correct':'Review this answer'}</h3><p>{status==='correct'?'You’re building a strong understanding.':'Every attempt helps you learn. Review the explanation, then try the next one.'}</p></div></div><p><strong>Correct answer:</strong> {q.correctAnswer}</p><p>{q.explanation}</p><button className="btn btn-primary" onClick={()=>{setSession(p=>({...p,index:p.index+1,status:null,answer:''}));}}>{index===questions.length-1?'See results':'Next question'}</button></div>}
     </section>}
+    {deletingSet&&<ConfirmDialog title={deletingSet.generated?'Delete generated set?':'Delete selected questions?'} confirmLabel={`Delete ${deletingSet.ids.length} questions`} message={<>{`Remove all ${deletingSet.ids.length} questions ${deletingSet.generated?'from this generated set, including other question types in the set':'in the current document and question-type selection'}? This cannot be undone. Other questions, flashcards, notes, and PDFs are kept.`}{deleteError&&<span role="alert"> {deleteError}</span>}</>} onCancel={()=>setDeletingSet(null)} onConfirm={()=>{if(deleteQuizQuestions(deletingSet.ids)){setDeletingSet(null);}else setDeleteError('The deletion could not be saved. Please try again.');}}/>}
     {saving&&<p role="status">Saving quiz score…</p>}
     {saveError&&<div role="alert"><p>{saveError}</p><button className="btn btn-secondary" onClick={saveHistory}>Retry saving score</button></div>}
     {history.length>0&&<details><summary>Quiz history</summary>{history.map(h=><p key={h.id}>{new Date(h.created_at).toLocaleString()}: {h.score} / {h.total_questions}</p>)}</details>}

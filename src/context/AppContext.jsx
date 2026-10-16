@@ -36,6 +36,10 @@ export function AppProvider({ children }) {
   const deleteFlashcard = useCallback(id => setStudy(p => ({...p,flashcards:p.flashcards.filter(c => c.id !== id)})), []);
   const updateQuizQuestion=useCallback((id,patch)=>setStudy(p=>({...p,quizQuestions:p.quizQuestions.map(q=>q.id===id?{...q,...patch,edited:true}:q)})),[]);
   const deleteQuizQuestion=useCallback(id=>setStudy(p=>({...p,quizQuestions:p.quizQuestions.filter(q=>q.id!==id)})),[]);
+  const deleteQuizQuestions=useCallback(ids=>{
+    const selected=new Set(ids);
+    return setStudy(p=>({...p,quizQuestions:p.quizQuestions.filter(q=>!selected.has(q.id))}));
+  },[]);
   const setQuizQuestions = useCallback(questions => setStudy(p => ({...p,quizQuestions:[...p.quizQuestions,...questions]})), []);
   const saveStudyMaterials = useCallback((pdfId, result) => setStudy(p => {
     const old = new Map(p.flashcards.filter(c => c.pdfId === pdfId).map(c => [c.id,c]));
@@ -358,7 +362,7 @@ export function AppProvider({ children }) {
       dismissToast,
       clearAllData,
       flashcards, addFlashcard, updateFlashcard, deleteFlashcard,
-      quizQuestions, setQuizQuestions, updateQuizQuestion, deleteQuizQuestion,
+      quizQuestions, setQuizQuestions, updateQuizQuestion, deleteQuizQuestion, deleteQuizQuestions,
       saveStudyMaterials, appendStudyMaterials,
     }),
     [
@@ -392,7 +396,7 @@ export function AppProvider({ children }) {
       dismissToast,
       clearAllData,
       flashcards, addFlashcard, updateFlashcard, deleteFlashcard,
-      quizQuestions, setQuizQuestions, updateQuizQuestion, deleteQuizQuestion,
+      quizQuestions, setQuizQuestions, updateQuizQuestion, deleteQuizQuestion, deleteQuizQuestions,
       saveStudyMaterials, appendStudyMaterials,
     ]
   );

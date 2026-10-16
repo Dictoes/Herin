@@ -1,4 +1,4 @@
-const STOP_WORDS = new Set([
+﻿const STOP_WORDS = new Set([
   'about', 'after', 'again', 'also', 'answer', 'could', 'explain', 'from', 'have',
   'into', 'make', 'more', 'please', 'same', 'that', 'their', 'them', 'there',
   'these', 'this', 'what', 'when', 'where', 'which', 'with', 'would', 'your',
@@ -9,20 +9,33 @@ function queryTerms(question) {
     .filter(term => !STOP_WORDS.has(term)))].slice(0, 16);
 }
 
+function scoreText(text, terms) {
+  const lower = text.toLowerCase();
+  return terms.reduce((score, term) => score + (lower.includes(term) ? 1 : 0), 0);
+}
+
+function sample(items, count) {
+  if (count <= 0) return [];
+  if (items.length <= count) return items;
+  if (count === 1) return [items[0]];
+  return Array.from({length:count}, (_, i) => items[Math.round(i * (items.length - 1) / (count - 1))]);
+}
+
 function selectRelevantText(text, terms, maxLength) {
-  const paragraphs = text.split(/\n{2,}|(?<=[.!?])\s+(?=[A-Z0-9])/)
-    .map(part => part.trim()).filter(Boolean);
-  const ranked = paragraphs.map((paragraph, index) => ({
-    paragraph,
-    index,
-    score: terms.reduce((total, term) => total + (paragraph.toLowerCase().includes(term) ? 1 : 0), 0),
-  })).filter(item => item.score > 0)
-    .sort((first, second) => second.score - first.score || first.index - second.index);
+  // Search inside long paragraphs too, including the end of a PDF page or note.
+  const chunks = [];
+  for (let start = 0; start < text.length; start += 800) {
+    const part = text.slice(start, start + 900).trim();
+    if (part) chunks.push({text:part, score:scoreText(part, terms)});
+  }
+  const candidates = terms.length
+    ? chunks.filter(chunk => chunk.score > 0).sort((a,b) => b.score - a.score)
+    : sample(chunks, Math.max(1, Math.floor(maxLength / 700)));
   let selected = '';
-  for (const item of ranked) {
-    const candidate = selected ? `${selected}\n\n${item.paragraph}` : item.paragraph;
-    if (candidate.length > maxLength) continue;
-    selected = candidate;
+  for (const chunk of candidates) {
+    const remaining = maxLength - selected.length - (selected ? 2 : 0);
+    if (remaining <= 0) break;
+    selected += (selected ? '\n\n' : '') + chunk.text.slice(0, remaining);
   }
   return selected;
 }
@@ -42,26 +55,40 @@ function flattenPages(value) {
   return [];
 }
 
+// Recognize administrative slide headings, not incidental mentions in a lesson.
+function isCourseOverview(text) {
+  const heading = text.trim().slice(0, 180).replace(/\s+/g, ' ');
+  return /^(?:\d+\s+)?(?:(?:course|learning|module)\s+(?:outcomes?|objectives?|overview|requirements?|materials?|policies|syllabus)|syllabus|grading\s+(?:system|criteria|policy)|what\s+does\s+.{1,50}\s+cover\?)/i.test(heading);
+}
+
 export function buildAskContext({question, pdfId, pdfs, extractedText, notes, highlights, selectedHighlightIds, preferredPage, maxSources = 12}) {
-  const terms = queryTerms(question);
-  if (!terms.length) return [];
-  const sources = [];
+  const broad = /^(explain a key idea from my material|what are the main points of my notes\??|help me understand this highlight|(?:please )?(?:summari[sz]e|explain|give (?:me )?(?:a |an )?(?:summary|overview) of) (?:this|the|my|the selected|the whole|the entire) (?:page|notes|material|pdf|document|topic|lesson|chapter)|what (?:is|are) the main (?:topic|topics|points|ideas)(?: of (?:this|the) (?:pdf|document|lesson))?)\s*[?.!]?$/i.test(question.trim());
+  const terms = broad ? [] : queryTerms(question);
+  if (!terms.length && !broad) return [];
   const pdf = pdfs.find(item => item.id === pdfId);
-  if (pdf) {
-    const pages = flattenPages(extractedText).sort((first, second) => Number(second.page === preferredPage) - Number(first.page === preferredPage));
-    const allocation = Math.max(500, Math.min(2200, Math.floor(12000 / Math.max(1, pages.length))));
-    for (const page of pages) {
-      const text = selectRelevantText(page.text, terms, allocation);
-      if (text) sources.push({kind:'pdf',title:pdf.title || pdf.name || 'Current PDF',text,...(page.page ? {page:page.page} : {})});
-    }
-  }
-  for (const note of notes.filter(item => item.pdfId === pdfId)) {
+  if (!pdf) return [];
+  const limit = Math.max(1, Math.min(12, maxSources));
+  const rank = (a,b) => scoreText(b.text,terms) - scoreText(a.text,terms);
+  const noteSources = notes.filter(item => item.pdfId === pdfId).flatMap(note => {
     const text = selectRelevantText(note.content || note.text || '', terms, 1600);
-    if (text) sources.push({kind:'note',title:note.title || 'Study note',text,...(Number.isInteger(note.pageNum) && note.pageNum > 0 ? {page:note.pageNum} : {})});
-  }
-  for (const highlight of highlights.filter(item => selectedHighlightIds.has(item.id) && item.pdfId === pdfId)) {
-    const text = selectRelevantText(highlight.text || '', terms, 1200);
-    if (text) sources.push({kind:'highlight',title:'Selected highlight',text,...(Number.isInteger(highlight.pageNum) && highlight.pageNum > 0 ? {page:highlight.pageNum} : {})});
-  }
-  return sources.slice(0, maxSources);
+    return text ? [{kind:'note',title:(note.title || 'Study note').slice(0,180),text,...(Number.isInteger(note.pageNum) && note.pageNum > 0 ? {page:note.pageNum} : {})}] : [];
+  });
+  const highlightSources = highlights.filter(item => selectedHighlightIds.has(item.id) && item.pdfId === pdfId).flatMap(highlight => {
+    const text = selectRelevantText(highlight.text || '', [], 1200);
+    return text ? [{kind:'highlight',title:'Selected highlight',text,...(Number.isInteger(highlight.pageNum) && highlight.pageNum > 0 ? {page:highlight.pageNum} : {})}] : [];
+  }).sort(rank);
+  // Explicit selections get reserved slots, without crowding out the PDF entirely.
+  const personal = [...noteSources.slice(0,1), ...sample(highlightSources,3)].slice(0,limit);
+  const pages = flattenPages(extractedText).filter(page => page.text.trim());
+  const rankedPages = pages.map(page => ({...page, score:scoreText(page.text, terms)}))
+    .filter(page => broad || page.score > 0)
+    .sort((a,b) => b.score - a.score || Number(b.page === preferredPage) - Number(a.page === preferredPage));
+  const slots = limit - personal.length;
+  // Broad prompts sample across the document, not just its opening pages.
+  const lessonPages = rankedPages.filter(page => !isCourseOverview(page.text));
+  const chosen = broad ? sample(lessonPages.length ? lessonPages : rankedPages, slots) : rankedPages.slice(0,slots);
+  const allocation = Math.min(2200, Math.floor(12000 / Math.max(1,chosen.length)));
+  const pdfSources = chosen.map(page => ({kind:'pdf', title:(pdf.title || pdf.name || 'Current PDF').slice(0,180),
+    text:selectRelevantText(page.text,terms,allocation), ...(page.page ? {page:page.page} : {})})).filter(source => source.text);
+  return [...pdfSources,...personal];
 }

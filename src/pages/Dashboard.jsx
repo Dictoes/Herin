@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { Clock, MapPin, FileText, NotebookPen, CalendarDays, ArrowRight, CalendarPlus, UploadCloud } from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import EmptyState from '../components/common/EmptyState';
+import Yuki from '../components/common/Yuki';
 import { useApp } from '../context/AppContext';
 import {
   todayClasses,
@@ -14,6 +15,15 @@ import {
   formatTime,
   DAYS,
 } from '../utils/scheduleUtils';
+
+const YUKI_ENCOURAGEMENTS = [
+  'One small step today is still progress.',
+  'Take it one topic at a time. You can do this.',
+  'You don\'t need to rush. Give yourself time to learn.',
+  'A tricky question is a chance to understand more.',
+  'Start with one page. See where it takes you.',
+  'Pause, breathe, and try again. I\'m cheering for you.',
+];
 
 function Countdown({ cls, daysAway, now }) {
   const mins = minutesUntil(cls, now, daysAway);
@@ -29,6 +39,16 @@ function Countdown({ cls, daysAway, now }) {
 }
 
 export default function Dashboard() {
+  const [encouragementIndex] = useState(() => {
+    try {
+      const previous = sessionStorage.getItem('herin:yuki-encouragement');
+      if (previous !== null && Number.isInteger(Number(previous))) return (Number(previous) + 1) % YUKI_ENCOURAGEMENTS.length;
+    } catch { /* Greetings also work when browser storage is unavailable. */ }
+    return Math.floor(Math.random() * YUKI_ENCOURAGEMENTS.length);
+  });
+  useEffect(() => {
+    try { sessionStorage.setItem('herin:yuki-encouragement', String(encouragementIndex)); } catch { /* Optional presentation preference. */ }
+  }, [encouragementIndex]);
   const { classes, pdfs, notes, now, settings, flashcards } = useApp();
   const quizSession = storage.getQuizSession();
   const today = todayClasses(classes, now);
@@ -44,9 +64,28 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard" subtitle={`${todayLabel}, ${dateLabel}`}>
-      <section className="welcome-banner"><div><div className="eyebrow">YOUR STUDY WORKSPACE</div><h2>{settings.displayName ? `Welcome back, ${settings.displayName}.` : 'Make room for your best work.'}</h2><p>Your classes, readings, and ideas. All in one place.</p></div><NotebookPen size={44} strokeWidth={1.2}/></section>
+      <section className="welcome-banner">
+        <div className="dashboard-yuki-greeting">
+          <Yuki state="welcome" size="small" className="dashboard-yuki"/>
+          <div className="dashboard-yuki-bubble" aria-label="Encouragement from Yuki">
+            <p>{YUKI_ENCOURAGEMENTS[encouragementIndex]}</p>
+          </div>
+        </div>
+        <div><div className="eyebrow">YOUR STUDY WORKSPACE</div><h2>{settings.displayName ? `Welcome back, ${settings.displayName}.` : 'Make room for your best work.'}</h2><p>Your classes, readings, and ideas. All in one place.</p></div>
+      </section>
       <div className="stat-grid"><div className="stat-card"><CalendarDays size={19}/><strong>{today.length}</strong><span>Classes today</span></div><div className="stat-card"><FileText size={19}/><strong>{pdfs.filter(p=>p.kind !== 'note').length}</strong><span>Study materials</span></div><div className="stat-card"><NotebookPen size={19}/><strong>{Object.values(notes).filter(n=>n.content?.trim()).length}</strong><span>Saved notes</span></div></div>
-      <div className="card study-overview"><h2>Your study progress</h2><p>{flashcards.filter(c=>c.reviews>0).length} of {flashcards.length} flashcards reviewed</p><p>Last quiz: {quizSession.score||0} correct · {(quizSession.index||0)+(quizSession.status?1:0)} answered</p><Link className="btn btn-secondary" to="/flashcards">Review flashcards</Link> <Link className="btn btn-secondary" to="/quiz">Continue saved quiz</Link></div>
+      <section className="study-overview" aria-labelledby="study-progress-title">
+        <h2 id="study-progress-title">Your study progress</h2>
+        <div className="study-progress-item">
+          <p>{flashcards.filter(c=>c.reviews>0).length} of {flashcards.length} flashcards reviewed</p>
+          <progress aria-label="Flashcards reviewed" value={flashcards.filter(c=>c.reviews>0).length} max={flashcards.length || 1}/>
+          <Link className="study-action-link" to="/flashcards">Review flashcards <ArrowRight size={16} aria-hidden="true"/></Link>
+        </div>
+        <div className="study-progress-item">
+          <p>Last quiz: {quizSession.score||0} correct · {(quizSession.index||0)+(quizSession.status?1:0)} answered</p>
+          <Link className="study-action-link" to="/quiz">Continue saved quiz <ArrowRight size={16} aria-hidden="true"/></Link>
+        </div>
+      </section>
       <div className="dash-grid">
         <div className="dashboard-main-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           {upcoming ? (
@@ -120,7 +159,7 @@ export default function Dashboard() {
           <Deadlines/>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+        <div className="dashboard-side-column" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
           <div className="card">
             <div className="section-title">Quick links</div>
             <div className="quick-links" style={{ gridTemplateColumns: '1fr' }}>
