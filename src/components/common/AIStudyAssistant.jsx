@@ -10,13 +10,13 @@ import {processPdf} from '../../utils/processPdf';
 import {readStudyResponse} from '../../utils/aiResponse';
 import {quizTypeOptions,quizTypeLabels} from '../../utils/quizTypes';
 
-export default function AIStudyAssistant({meta}) {
+export default function AIStudyAssistant({meta,initialGenerate}) {
   const app=useApp(),navigate=useNavigate();
   const [quantity,setQuantity]=useState(10),[difficulty,setDifficulty]=useState('mixed'),[topicId,setTopicId]=useState(''),[quizType,setQuizType]=useState('all');
   const [topics,setTopics]=useState([]),[summaries,setSummaries]=useState([]),[status,setStatus]=useState('Ready'),[error,setError]=useState('');
   const [busy,setBusy]=useState(false),[result,setResult]=useState(null),[topicForm,setTopicForm]=useState(false);
   const [topicName,setTopicName]=useState(''),[start,setStart]=useState(1),[end,setEnd]=useState(meta.pageCount||1);
-  const flight=useRef(false),retry=useRef(null),mounted=useRef(true);
+  const flight=useRef(false),retry=useRef(null),mounted=useRef(true),autoGenerate=useRef(false);
   const owner=useRef(cloudUser());
   const current=()=>mounted.current&&cloudUser()===owner.current;
   async function loadExtras() {
@@ -58,6 +58,11 @@ export default function AIStudyAssistant({meta}) {
     }catch(e){if(current()){setError(e.message);setStatus('Error');}}
     finally{flight.current=false;if(current())setBusy(false);}
   }
+  useEffect(()=>{
+    if(autoGenerate.current||!['quiz','flashcards'].includes(initialGenerate))return;
+    autoGenerate.current=true;
+    void generate(initialGenerate);
+  },[initialGenerate,meta.id]);
   useEffect(()=>{try{const saved=JSON.parse(sessionStorage.getItem(`herin:ai:${owner.current}:${meta.id}`));if(saved){retry.current=saved;setError('An earlier request may have been interrupted. Retry to retrieve its results without duplicate saves.');}}catch{}},[meta.id]);
   async function addTopic(event){
     event.preventDefault();setError('');

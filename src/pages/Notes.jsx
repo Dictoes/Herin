@@ -4,6 +4,7 @@ import { NotebookPen, Search, Highlighter, FileText } from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import EmptyState from '../components/common/EmptyState';
 import { useApp } from '../context/AppContext';
+import Yuki from '../components/common/Yuki';
 
 function timeAgo(iso) {
   if (!iso) return '';
@@ -37,6 +38,7 @@ export default function Notes() {
 
   return (
     <AppLayout title="Notes" subtitle="Everything you've written and highlighted, in one place" actions={<button className="btn btn-primary" onClick={()=>{const id=addStandaloneNote();navigate(`/pdfs/${id}?notes=1`);}}>New note</button>}>
+      <aside className="yuki-note-tip"><Yuki state="notes" size="small"/><p><strong>Yuki’s tip</strong> Ask Herin can use relevant text from a PDF, your notes, and the highlights you choose.</p><Link to="/ask">Ask Herin</Link></aside>
       {pdfs.length === 0 ? (
         <EmptyState
           icon={NotebookPen}

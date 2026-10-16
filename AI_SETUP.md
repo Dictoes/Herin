@@ -1,5 +1,13 @@
 # Herin AI Study Assistant
 
+## Ask Herin and Yuki
+
+Ask Herin is available in the authenticated workspace navigation and from each PDF reader. It calls the existing `generate-study-content` Supabase Edge Function; the Gemini key remains server-side as `GEMINI_API_KEY`. The `ask` action accepts bounded chat history and only relevant excerpts selected in the browser from the current PDF, its notes, and highlights the student has chosen to share. Page references are returned only for page metadata included with those excerpts. If relevant material is unavailable, the answer is instructed to say so rather than invent source details.
+
+The Notes page links to Ask Herin; quiz feedback uses the existing question explanation with Yuki's correct/wrong reactions. Chat actions for flashcards and practice questions return to the existing PDF study assistant and generation workflow.
+
+The supplied four-column by six-row Yuki atlas is stored at `public/yuki-study-helper.png` (768 × 1152 pixels; 192 × 192-pixel frames). `src/utils/yukiStates.js` maps the six sprite rows. The reusable component honors `prefers-reduced-motion`.
+
 Implemented in the existing PDF reader without replacing highlights, notes, local generation, flashcard review, quiz practice, themes, schedules, or private PDF storage.
 
 ## What it does

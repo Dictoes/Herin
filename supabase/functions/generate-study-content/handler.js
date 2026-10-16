@@ -1,4 +1,4 @@
-import {StudyError, validateRequest, sectionsFrom, generateSections} from './core.js';
+import {StudyError, validateRequest, validateAskRequest, sectionsFrom, generateSections, answerQuestion} from './core.js';
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, x-client-info, apikey, content-type','Access-Control-Allow-Methods':'POST, OPTIONS'};
 const reply = (body, status = 200) => new Response(JSON.stringify(body), {status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
 const success = result => reply({...result,success:true,saved:true,flashcards:result.flashcards||[],quiz_questions:(result.quiz?.questions||[]).map(q=>({type:q.type,question:q.question,...(Array.isArray(q.options)?{choices:q.options}:{}),...(Array.isArray(q.expectedItems)?{expected_items:q.expectedItems}:{}),correct_answer:q.correctAnswer,explanation:q.explanation,difficulty:q.difficulty,source_page:q.sourcePage}))});
@@ -12,7 +12,7 @@ const dbError = error => {
   const match = Object.keys(known).find(k=>error?.message?.includes(k));
   return match ? new StudyError(match,...known[match]) : new StudyError('DATABASE_ERROR','Study results could not be saved. Check the AI database migration, then retry.',503);
 };
-export function createHandler({createClient, env, generate = generateSections}) {
+export function createHandler({createClient, env, generate = generateSections, answer = answerQuestion}) {
   return async request => {
     if (request.method === 'OPTIONS') return new Response(null,{headers:cors});
     if (request.method !== 'POST') return failure(new StudyError('INVALID_REQUEST','Use POST.',405));
@@ -25,8 +25,16 @@ export function createHandler({createClient, env, generate = generateSections}) 
       if (authError || !user) throw new StudyError('AUTH_REQUIRED','Your session expired. Sign in again.',401);
       stage='request_validation';
       const raw = await request.text();
-      if (raw.length > 4096) throw new StudyError('INVALID_REQUEST','Request is too large.');
-      try {input = validateRequest(JSON.parse(raw));} catch (e) { if (e instanceof StudyError) throw e; throw new StudyError('INVALID_REQUEST','Choose a PDF and generation options.'); }
+      if (raw.length > 40000) throw new StudyError('INVALID_REQUEST','Request is too large.');
+      let body;
+      try { body = JSON.parse(raw); } catch { throw new StudyError('INVALID_REQUEST','Choose a PDF or enter a study question.'); }
+      if (body?.action === 'ask') {
+        input = validateAskRequest(body);
+        stage='gemini_ask';
+        const result = await answer(input,{key:env('GEMINI_API_KEY'),model:env('GEMINI_MODEL') || 'gemini-3.5-flash-lite'});
+        return reply({success:true,...result});
+      }
+      input = validateRequest(body);
       stage='ownership';
       const pdf = await client.from('pdfs').select('id,user_id,class_id,extracted_text').eq('id',input.pdfId).eq('user_id',user.id).maybeSingle();
       if (pdf.error) throw dbError(pdf.error);

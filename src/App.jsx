@@ -11,6 +11,7 @@ const PDFViewer = lazy(() => import('./pages/PDFViewer'));
 import Notes from './pages/Notes';
 import Settings from './pages/Settings';
 import Flashcards from './pages/Flashcards'; import Quiz from './pages/Quiz';
+import AskHerin from './pages/AskHerin';
 
 function Workspace() {
   return (
@@ -21,6 +22,7 @@ function Workspace() {
           <Route path="/pdfs" element={<PDFLibrary />} />
           <Route path="/pdfs/:id" element={<PDFViewer />} />
           <Route path="/notes" element={<Notes />} />
+          <Route path="/ask" element={<AskHerin />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/flashcards" element={<Flashcards />} /><Route path="/quiz" element={<Quiz />} />
           <Route path="*" element={<Dashboard />} />

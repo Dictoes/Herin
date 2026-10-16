@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateRequest,sectionsFrom,responseSchema,validateOutput,callGemini,generateSections,StudyError} from '../supabase/functions/generate-study-content/core.js';
+import {readFileSync} from 'node:fs';
+import {validateRequest,validateAskRequest,sectionsFrom,responseSchema,validateOutput,callGemini,answerQuestion,generateSections,StudyError} from '../supabase/functions/generate-study-content/core.js';
 import {createHandler} from '../supabase/functions/generate-study-content/handler.js';
+import {YUKI_ROWS} from '../src/utils/yukiStates.js';
 const id='aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',requestId='bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb';
 const base={pdfId:id,requestId,contentType:'both',quantity:10,difficulty:'mixed'};
 const section={text:'[Page 1] Photosynthesis uses light.',pages:[1]};
@@ -15,6 +17,35 @@ const typedQuestions=[
 ];
 const output={flashcards:[card],quiz_questions:[quiz]};
 const response=data=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(data)}]}}]}));
+test('Yuki states map to the supplied six atlas rows',()=>{
+  const sprite=readFileSync(new URL('../public/yuki-study-helper.png',import.meta.url));
+  assert.equal(sprite.readUInt32BE(16),768);
+  assert.equal(sprite.readUInt32BE(20),1152);
+  assert.equal(sprite.readUInt32BE(16)/4,sprite.readUInt32BE(20)/6);
+  assert.deepEqual(YUKI_ROWS,{idle:0,welcome:1,notes:2,thinking:3,explaining:3,quizWrong:4,quizCorrect:5});
+});
+test('Ask requests are bounded, normalized, and retain only valid source metadata',()=>{
+  const body={action:'ask',question:'  Explain photosynthesis  ',history:[{role:'user',text:'What does the source say?'}],context:[{kind:'pdf',title:'Biology',text:'Plants use light.',page:2}]};
+  assert.deepEqual(validateAskRequest(body),{question:'Explain photosynthesis',history:[{role:'user',text:'What does the source say?'}],context:[{kind:'pdf',title:'Biology',text:'Plants use light.',page:2}]});
+  for(const invalid of [{...body,question:''},{...body,history:Array(9).fill(body.history[0])},{...body,context:[{...body.context[0],page:0}]},{...body,context:[{...body.context[0],kind:'url'}]}])assert.throws(()=>validateAskRequest(invalid),StudyError);
+  assert.throws(()=>validateAskRequest({...body,context:Array(4).fill({kind:'note',title:'Note',text:'x'.repeat(6000)})}),StudyError);
+});
+test('Ask sends supplied context only to Gemini and constrains source pages',async()=>{
+  const request=validateAskRequest({action:'ask',question:'What is photosynthesis?',history:[],context:[{kind:'pdf',title:'Biology',text:'Plants use light.',page:2}]});
+  let payload;
+  const result=await answerQuestion(request,{key:'server-test-key',fetcher:async(_url,options)=>{
+    payload=JSON.parse(options.body);
+    assert.equal(options.headers['x-goog-api-key'],'server-test-key');
+    assert.match(payload.systemInstruction.parts[0].text,/Plants use light/);
+    assert.doesNotMatch(payload.systemInstruction.parts[0].text,/private omitted material/);
+    assert.deepEqual(payload.generationConfig.responseJsonSchema.properties.source_pages.items.enum,[2]);
+    return response({answer:'The source says plants use light.',source_pages:[2]});
+  }});
+  assert.deepEqual(result,{answer:'The source says plants use light.',sourcePages:[2]});
+  await assert.rejects(answerQuestion(request,{key:'test',fetcher:async()=>response({answer:'Unverified.',source_pages:[99]})}),e=>e.code==='INVALID_RESPONSE');
+  await assert.rejects(answerQuestion(request,{key:'',fetcher:async()=>{throw Error('should not run');}}),e=>e.code==='MISSING_API_KEY');
+  assert.equal(payload.contents.at(-1).parts[0].text,request.question);
+});
 test('AI request rejects empty, invalid identifiers, quantity and difficulty; defaults are safe',()=>{
   for(const b of [null,{}, {...base,pdfId:'pdf_legacy'},{...base,quantity:0},{...base,quantity:31},{...base,difficulty:'expert'},{...base,topicId:'other'}])assert.throws(()=>validateRequest(b),StudyError);
   assert.deepEqual(validateRequest({pdfId:id,requestId}),{...base,classId:null,topicId:null});
@@ -120,6 +151,22 @@ function fixture({authenticated=true,owns=true,dbFailure=false,completed=false,t
 test('handler rejects unauthenticated requests and cross-owner PDF/class/topic before Gemini',async()=>{
   let f=fixture();assert.equal((await f.invoke(base,false)).status,401);assert.equal(f.counts().generated,0);
   for(const options of [{authenticated:false},{owns:false},{topicOwns:false},{classOwns:false}]){f=fixture(options);assert.ok((await f.invoke({...base,topicId:id,classId:id})).status>=400);assert.equal(f.counts().generated,0);}
+});
+test('authenticated Ask action uses the existing server Gemini configuration without returning secrets',async()=>{
+  let received;
+  const client={auth:{getUser:async()=>({data:{user:{id}}})}};
+  const handler=createHandler({
+    createClient:()=>client,
+    env:key=>({GEMINI_API_KEY:'server-only-key',GEMINI_MODEL:'existing-model'})[key],
+    answer:async(input,options)=>{received={input,options};return {answer:'The supplied text explains the topic.',sourcePages:[2]};},
+  });
+  const result=await handler(new Request('https://example.test',{method:'POST',headers:{Authorization:'Bearer signed-in-token'},body:JSON.stringify({
+    action:'ask',question:'Explain this',history:[],context:[{kind:'pdf',title:'Biology',text:'Plants use light.',page:2}],
+  })}));
+  assert.equal(result.status,200);
+  assert.deepEqual(await result.json(),{success:true,answer:'The supplied text explains the topic.',sourcePages:[2]});
+  assert.deepEqual(received.options,{key:'server-only-key',model:'existing-model'});
+  assert.equal(received.input.context[0].page,2);
 });
 test('handler surfaces safe DB failure and reuses completed request without AI or another save',async()=>{
   const f=fixture({dbFailure:true}),r=await f.invoke();assert.equal(r.status,503);const failure=await r.json();assert.equal(failure.success,false);assert.equal(failure.error.code,'DATABASE_ERROR');assert.ok(!JSON.stringify(failure).includes('private postgres'));

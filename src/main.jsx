@@ -5,6 +5,7 @@ import './styles/global.css';
 import './styles/study.css';
 import './styles/interface.css';
 import './styles/auth.css';
+import './styles/ask-herin.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
