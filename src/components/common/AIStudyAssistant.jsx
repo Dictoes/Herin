@@ -3,6 +3,7 @@ import {Link, useNavigate} from 'react-router-dom';
 import {Loader2, Sparkles, Trash2, BookOpen} from 'lucide-react';
 import Yuki from './Yuki';
 import ConfirmDialog from './ConfirmDialog';
+import GenerationAllowance from './GenerationAllowance';
 import {useApp} from '../../context/AppContext';
 import {supabase} from '../../lib/supabase';
 import {cloudUser, flushCloud, refreshCloud} from '../../utils/cloudStore';
@@ -17,6 +18,7 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
   const [quantity,setQuantity]=useState(10),[difficulty,setDifficulty]=useState('mixed'),[topicId,setTopicId]=useState(''),[quizType,setQuizType]=useState('all');
   const [topics,setTopics]=useState([]),[summaries,setSummaries]=useState([]),[status,setStatus]=useState('Ready'),[error,setError]=useState('');
   const [busy,setBusy]=useState(false),[result,setResult]=useState(null),[topicForm,setTopicForm]=useState(false);
+  const [quotaExhausted,setQuotaExhausted]=useState(false);
   const [deleting,setDeleting]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[summaryFeedback,setSummaryFeedback]=useState(null);
   const deleteFlight=useRef(false);
   const [topicName,setTopicName]=useState(''),[start,setStart]=useState(1),[end,setEnd]=useState(meta.pageCount||1);
@@ -112,7 +114,8 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
       <button className="btn btn-secondary" disabled={busy}>Save topic</button>
     </form>}
     </div>
-    <div className="ai-actions">{[['flashcards','Generate Flashcards'],['quiz','Generate Quiz'],['both','Generate Both'],['summary','Summarize topic']].map(([type,label])=><button className={`btn ${type==='both'?'btn-primary':'btn-secondary'}`} key={type} disabled={busy||meta.status==='processing'||!Number.isInteger(Number(quantity))||quantity<1||quantity>30} onClick={()=>generate(type)}>{label}</button>)}</div>
+    <GenerationAllowance busy={busy} onExhaustedChange={setQuotaExhausted}/>
+    <div className="ai-actions">{[['flashcards','Generate Flashcards'],['quiz','Generate Quiz'],['both','Generate Both'],['summary','Summarize topic']].map(([type,label])=><button className={`btn ${type==='both'?'btn-primary':'btn-secondary'}`} key={type} disabled={busy||quotaExhausted||meta.status==='processing'||!Number.isInteger(Number(quantity))||quantity<1||quantity>30} onClick={()=>generate(type)}>{label}</button>)}</div>
     <p role="status" aria-live="polite">{busy&&<Loader2 className="ai-spinner" size={16}/>} {meta.status==='processing'&&!busy?'Extracting PDF text':status}{busy?' · Large PDFs may take longer. Results save automatically.':''}</p>
     {error&&<div role="alert"><p>{error}</p>{retry.current&&<button className="btn btn-secondary" disabled={busy} onClick={()=>generate(retry.current.contentType,true)}>Retry AI generation</button>}</div>}
     {result&&!busy&&!error&&status==='Completed'&&<div className="ai-success" role="status">

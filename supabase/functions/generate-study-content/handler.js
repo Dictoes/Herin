@@ -8,7 +8,7 @@ const failure = error => {
   return reply({success:false,error:detail,...detail},error.status);
 };
 const dbError = error => {
-  const known = {IN_PROGRESS:['Generation is still running. Wait a few minutes, then retry.',409],REQUEST_CONFLICT:['This request has changed. Start a new generation.',409],DAILY_LIMIT:['The daily study limit was reached. Try again tomorrow.',429],NOT_FOUND:['The PDF, class, or topic is unavailable.',404]};
+  const known = {IN_PROGRESS:['Generation is still running. Wait a few minutes, then retry.',409],REQUEST_CONFLICT:['This request has changed. Start a new generation.',409],DAILY_LIMIT:['The generation allowance is used up. Check the reset time.',429],GENERATION_LIMIT:['All 20 generations in this 8-hour window are used. Check the reset countdown in AI Herin Assistant.',429],NOT_FOUND:['The PDF, class, or topic is unavailable.',404]};
   const match = Object.keys(known).find(k=>error?.message?.includes(k));
   return match ? new StudyError(match,...known[match]) : new StudyError('DATABASE_ERROR','Study results could not be saved. Check the AI database migration, then retry.',503);
 };

@@ -7,7 +7,7 @@ const user={id:'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa',email:'student@example.tes
 const tables=Object.fromEntries(['profiles','user_preferences','classes','pdfs','notes','highlights','flashcards','quizzes','assignments','reminders','study_topics','study_generations','quiz_attempts','push_subscriptions','shared_study_links'].map(t=>[t,[]]));
 const pushTest=process.env.HERIN_PUSH_TEST==='1';
 const design=process.env.HERIN_DESIGN_TEST==='1'?require('./design-audit.cjs').capture:async()=>{};
-let aiCalls=0,aiFailure=false;
+let aiCalls=0,aiFailure=false,quotaOverride=null,quotaUnavailable=false;
 const files=new Map(),sharedPdfs=new Map();let rejectWrites=false,sharedUploadFailure=false,sharedUploadDelay=false,expireNextSignedUrl=false,sharedUploadCount=0,uploads=0,downloads=0;
 const jwt=()=>{const b=value=>Buffer.from(JSON.stringify(value)).toString('base64url');return b({alg:'HS256',typ:'JWT'})+'.'+b({sub:user.id,aud:'authenticated',role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})+'.test';};
 const session=()=>({access_token:jwt(),refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,token_type:'bearer',user});
@@ -74,6 +74,11 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   const result={generationId,flashcardCount:cards?1:0,quizCount:quizzes?1:0,quiz_questions:quizzes?[{type:'multiple',question:q.question,correct_answer:q.correctAnswer,choices:q.options,explanation:q.explanation,source_page:1,generation_id:generationId}]:[],summaries:body.contentType==='summary'?[{text:'Photosynthesis uses light.',pages:[1]}]:[]};
   tables.study_generations.push({id:generationId,user_id:user.id,pdf_id:pdf.id,status:'completed',created_at,result});return json(result);
  }
+ if(url.pathname==='/rest/v1/rpc/get_study_generation_quota'){
+  if(quotaUnavailable)return json({message:'Allowance unavailable'},503);
+  const now=Date.now(),reset=Math.floor(now/28800000)*28800000+28800000;
+  return json(quotaOverride||{limit:20,remaining:Math.max(0,20-tables.study_generations.filter(g=>g.user_id===user.id&&Date.parse(g.created_at)>=reset-28800000).length),server_now:new Date(now).toISOString(),resets_at:new Date(reset).toISOString()});
+ }
  if(url.pathname==='/rest/v1/rpc/create_study_share'){
   const b=request.postDataJSON();assert.ok(['pdf','note','quiz','flashcard'].includes(b.p_kind));assert.deepEqual(Object.keys(b.p_snapshot).sort(),['flashcards','quizzes','text']);
   if(!tables.shared_study_links.some(s=>s.share_id===b.p_share_id))tables.shared_study_links.push({share_id:b.p_share_id,user_id:user.id,title:b.p_title,subject:b.p_subject,content_snapshot:structuredClone(b.p_snapshot),created_at:new Date().toISOString(),is_public:true,pdf_file_name:b.p_pdf_file_name,pdf_file_size:b.p_pdf_file_size,pdf_mime_type:b.p_pdf_mime_type,pdf_attached_at:b.p_pdf_file_name?new Date().toISOString():null});return json(b.p_share_id);
@@ -124,7 +129,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  throw Error('Unhandled request: '+method+' '+url);
 });
-const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*(403|429)/.test(m.text())&&!(sharedUploadFailure&&/Failed to load resource:.*503/.test(m.text())))errors.push(m.text());});
+const page=await context.newPage(),errors=[];page.on('dialog',dialog=>dialog.accept());page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource:.*(403|429)/.test(m.text())&&!((sharedUploadFailure||quotaUnavailable)&&/Failed to load resource:.*503/.test(m.text())))errors.push(m.text());});
 const base=process.env.HERIN_URL||'http://127.0.0.1:4173';
 const saved=()=>page.getByText('Saved to Supabase',{exact:true}).first().waitFor();
 const navigate=async route=>{await page.goto(base+'/#/'+route);await page.locator('.topbar-title').waitFor();};
@@ -139,8 +144,10 @@ await navigate('pdfs');await page.locator('input[type=file]').setInputFiles(path
 await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);await expect.poll(()=>tables.pdfs[0]?.data.status,{timeout:15000}).toBe('ready');assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
 await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locator('.pdf-text-layer span').first().waitFor();
 const ai=page.getByRole('region',{name:'AI Herin Assistant'});
+await ai.getByText('20 of 20 generations remaining',{exact:true}).waitFor();
 await page.getByRole('button',{name:'AI Herin Assistant',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement.id),'ai-herin-assistant');
 await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
+await ai.getByText('19 of 20 generations remaining',{exact:true}).waitFor();
 await ai.getByText('Let’s go! Your quiz is ready!',{exact:true}).waitFor();assert.equal(await ai.locator('.ai-success .yuki').count(),1);
 await ai.getByRole('link',{name:'Review generated flashcards'}).click();await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('Light'));
 await page.reload();await page.getByRole('button',{name:'Tap to reveal answer'}).waitFor();assert.ok(await page.getByText('AI: What does photosynthesis use?',{exact:true}).count());
@@ -170,7 +177,22 @@ await ai.getByText('Summary deleted.',{exact:true}).waitFor();assert.equal(await
 await page.reload();await ai.getByText('No saved summaries yet. Choose Summarize topic to create one.',{exact:true}).waitFor();
 assert.ok(tables.study_generations.length>0);assert.ok(tables.flashcards.length>0);assert.ok(tables.quizzes.length>0);
 aiFailure=true;await ai.getByRole('button',{name:'Generate Flashcards',exact:true}).click();await ai.getByText(/AI quota or rate limit reached. Wait before retrying./).waitFor();assert.equal(await ai.locator('.ai-success').count(),0);aiFailure=false;await ai.getByRole('button',{name:'Retry AI generation'}).click();await ai.getByText('Completed',{exact:true}).waitFor();await ai.getByText('Your flashcards are ready!',{exact:true}).waitFor();
-for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:`test-results/ai-study-${width}.png`,fullPage:true});}
+await page.reload();await ai.getByText('17 of 20 generations remaining',{exact:true}).waitFor();
+quotaOverride={limit:20,remaining:0,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+4000).toISOString()};
+await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+await ai.getByText('0 of 20 generations remaining',{exact:true}).waitFor();
+await expect(ai.getByRole('button',{name:'Generate Quiz',exact:true})).toBeDisabled();
+quotaOverride={limit:20,remaining:20,server_now:new Date().toISOString(),resets_at:new Date(Date.now()+28800000).toISOString()};
+await ai.getByText('20 of 20 generations remaining',{exact:true}).waitFor({timeout:10000});
+await expect(ai.getByRole('button',{name:'Generate Quiz',exact:true})).toBeEnabled();
+quotaOverride=null;
+quotaUnavailable=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+await ai.getByText('Allowance unavailable',{exact:true}).waitFor();
+await expect(ai.getByRole('progressbar',{name:'Generations remaining'})).toHaveCount(0);
+quotaUnavailable=false;await ai.getByRole('button',{name:'Refresh allowance'}).click();
+await ai.getByText('17 of 20 generations remaining',{exact:true}).waitFor();
+await page.evaluate(()=>getSelection().removeAllRanges());await ai.getByRole('heading',{name:/AI Herin Assistant/}).click();
+for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));fs.mkdirSync('test-results',{recursive:true});for(const mode of ['light','dark']){await page.evaluate(mode=>document.documentElement.setAttribute('data-mode',mode),mode);await ai.screenshot({path:`test-results/ai-allowance-${width}-${mode}.png`});}await page.evaluate(()=>document.documentElement.setAttribute('data-mode','light'));await page.screenshot({path:`test-results/ai-study-${width}.png`,fullPage:true});}
 await page.locator('.pdf-text-layer').evaluate(el=>{const span=[...el.querySelectorAll('span')].find(s=>s.textContent.includes('Photosynthesis is'));if(!span)throw Error('No definition');const range=document.createRange();range.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(range);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
 await page.getByRole('button',{name:'PDF Yellow highlight',exact:true}).click();await saved();assert.ok(tables.highlights.length);assert.ok(tables.flashcards.length);assert.ok(tables.quizzes.length);
 await page.getByRole('tab',{name:'Extracted text',exact:true}).click();
