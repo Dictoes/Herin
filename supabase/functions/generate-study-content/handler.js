@@ -61,8 +61,18 @@ export function createHandler({createClient, env, generate = generateSections, a
       // remain private. Direct callers must also finish extraction before generating.
       stage='text_validation';
       const sections = sectionsFrom(pdf.data.extracted_text, topic);
+      let priorQuestions=[];
+      if(['quiz','both'].includes(input.contentType)){
+        stage='quiz_history';
+        let query=client.from('quizzes').select('questions').eq('pdf_id',input.pdfId).eq('user_id',user.id);
+        if(input.topicId)query=query.eq('topic_id',input.topicId);
+        const previous=await query.order('created_at',{ascending:false}).limit(100);
+        if(previous.error)throw dbError(previous.error);
+        priorQuestions=(previous.data||[]).flatMap(row=>Array.isArray(row.questions)?row.questions:[])
+          .slice(0,240).map(q=>({question:q.question,correct_answer:q.correctAnswer,explanation:q.explanation,source_page:q.sourcePage}));
+      }
       stage='gemini';
-      const result = await generate(sections,input,{key:env('GEMINI_API_KEY'),model:env('GEMINI_MODEL') || 'gemini-3.5-flash-lite'});
+      const result = await generate(sections,input,{key:env('GEMINI_API_KEY'),model:env('GEMINI_MODEL') || 'gemini-3.5-flash-lite',priorQuestions});
       stage='database_save';
       const saved = await client.rpc('finish_study_generation',{p_id:input.requestId,p_lease:lease,p_result:result});
       if (saved.error) throw dbError(saved.error);

@@ -81,7 +81,7 @@ test('valid questions survive malformed and duplicate model output without savin
 });
 test('a quiz with no valid questions reports insufficient source instead of saving an empty quiz',async()=>{
   const request={...base,contentType:'quiz'};
-  await assert.rejects(generateSections([section],request,{key:'test',fetcher:async()=>response({quiz_questions:[{...quiz,choices:['A','A','B','C']}]})}),e=>e.code==='INSUFFICIENT_SOURCE');
+  await assert.rejects(generateSections([section],request,{key:'test',reviewQuiz:async items=>items,fetcher:async()=>response({quiz_questions:[{...quiz,choices:['A','A','B','C']}]})}),e=>e.code==='INSUFFICIENT_SOURCE');
 });
 test('supported quiz types preserve their UI formats and specific requests discard other types',()=>{
   const all={...base,contentType:'quiz',quizType:'all'};
@@ -119,22 +119,22 @@ test('a temporary Google 503 can recover within the bounded retry budget',async(
   assert.equal(calls,2);assert.equal(result.quiz_questions.length,1);
 });
 test('multiple chunks deduplicate flashcards and quiz questions',async()=>{
-  const result=await generateSections([section,section],{...base,contentType:'flashcards'},{key:'test',fetcher:async()=>response({flashcards:[card]})});
+  const result=await generateSections([section,section],{...base,contentType:'flashcards'},{key:'test',reviewQuiz:async items=>items,fetcher:async()=>response({flashcards:[card]})});
   assert.equal(result.flashcards.length,1);
-  const quizResult=await generateSections([section,section],{...base,contentType:'quiz'},{key:'test',fetcher:async()=>response({quiz_questions:[quiz]})});
+  const quizResult=await generateSections([section,section],{...base,contentType:'quiz'},{key:'test',reviewQuiz:async items=>items,fetcher:async()=>response({quiz_questions:[quiz]})});
   assert.equal(quizResult.quiz_questions.length,1);
 });
 test('all mode mixes supported types and empty supported quiz output reports insufficient source',async()=>{
-  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:5},{key:'test',fetcher:async()=>response({quiz_questions:typedQuestions})});
+  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:5},{key:'test',reviewQuiz:async items=>items,fetcher:async()=>response({quiz_questions:typedQuestions})});
   assert.deepEqual(result.quiz_questions.map(q=>q.type),['multiple','identification','enumeration','application']);
-  await assert.rejects(generateSections([section],{...base,contentType:'quiz',quizType:'identification'},{key:'test',fetcher:async()=>response({quiz_questions:[]})}),e=>e.code==='INSUFFICIENT_SOURCE');
-  const both=await generateSections([section],{...base,contentType:'both',quizType:'all'},{key:'test',fetcher:async()=>response({flashcards:[card],quiz_questions:[]})});
+  await assert.rejects(generateSections([section],{...base,contentType:'quiz',quizType:'identification'},{key:'test',reviewQuiz:async items=>items,fetcher:async()=>response({quiz_questions:[]})}),e=>e.code==='INSUFFICIENT_SOURCE');
+  const both=await generateSections([section],{...base,contentType:'both',quizType:'all'},{key:'test',reviewQuiz:async items=>items,fetcher:async(_url,options)=>response(JSON.parse(options.body).generationConfig.responseJsonSchema.properties.flashcards?{flashcards:[card],quiz_questions:[]}:{quiz_questions:[]})});
   assert.equal(both.flashcards.length,1);assert.equal(both.quiz_questions.length,0);
 });
 test('all mode requests and saves up to ten questions of each supported type',async()=>{
   const types=['multiple','identification','enumeration','application'];
   const questions=types.flatMap((type,index)=>Array.from({length:10},(_,i)=>({...typedQuestions[index],question:`${typedQuestions[index].question} Item ${i+1}?`})));
-  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:10},{key:'test',fetcher:async(_url,options)=>{
+  const result=await generateSections([section],{...base,contentType:'quiz',quizType:'all',quantity:10},{key:'test',reviewQuiz:async items=>items,fetcher:async(_url,options)=>{
     const prompt=JSON.parse(options.body).contents[0].parts[0].text;
     assert.match(prompt,/Requested number of quiz questions per type when all types are selected, otherwise total: 10/);
     return response({quiz_questions:questions});
@@ -144,7 +144,7 @@ test('all mode requests and saves up to ten questions of each supported type',as
 });
 function fixture({authenticated=true,owns=true,dbFailure=false,completed=false,topicOwns=true,classOwns=true}={}){
   let generated=0,saved=0;
-  const client={auth:{getUser:async()=>({data:{user:authenticated?{id}:null}})},from(table){const q={select(){return q;},eq(){return q;},update(){return q;},maybeSingle:async()=>({data:table==='pdfs'?(owns?{id,extracted_text:{pages:[{pageNum:1,text:'Plants use light.'}]}}:null):table==='classes'?(classOwns?{id}:null):(topicOwns?{id,start_page:1,end_page:1}:null)})};return q;},rpc:async name=>{
+  const client={auth:{getUser:async()=>({data:{user:authenticated?{id}:null}})},from(table){const q={select(){return q;},eq(){return q;},order(){return q;},limit:async()=>({data:[]}),update(){return q;},maybeSingle:async()=>({data:table==='pdfs'?(owns?{id,extracted_text:{pages:[{pageNum:1,text:'Plants use light.'}]}}:null):table==='classes'?(classOwns?{id}:null):(topicOwns?{id,start_page:1,end_page:1}:null)})};return q;},rpc:async name=>{
     if(name==='claim_study_generation')return {data:{completed,result:{flashcardCount:1,quizCount:1}}};saved++;return dbFailure?{error:{message:'private postgres internals'}}:{data:{flashcardCount:1,quizCount:1}};
   }};
   const handler=createHandler({createClient:()=>client,env:()=>'',generate:async()=>{generated++;return output;}});
