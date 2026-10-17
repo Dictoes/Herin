@@ -1,5 +1,5 @@
 // Browser integration against a simulated Supabase HTTP API, never a live account.
-const {chromium}=require('@playwright/test');
+const {chromium,expect}=require('@playwright/test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
@@ -130,7 +130,7 @@ if(process.env.HERIN_DESIGN_TEST==='1'){
  for(const route of ['','schedule','pdfs','notes','ask','flashcards','quiz']){await navigate(route);await design(page,'empty-'+(route||'dashboard'));}
 }
 await navigate('pdfs');await page.locator('input[type=file]').setInputFiles(path.join(__dirname,'fixtures/Biology-course.pdf'));
-await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);assert.equal(tables.pdfs[0].data.status,'ready',JSON.stringify(tables.pdfs[0].data));assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
+await page.getByText('Ready',{exact:true}).waitFor({timeout:60000});await saved();assert.equal(uploads,1);await expect.poll(()=>tables.pdfs[0]?.data.status,{timeout:15000}).toBe('ready');assert.equal(tables.pdfs[0].extracted_text.pages.length,24);
 await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locator('.pdf-text-layer span').first().waitFor();
 const ai=page.getByRole('region',{name:'AI Herin Assistant'});
 await page.getByRole('button',{name:'AI Herin Assistant',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement.id),'ai-herin-assistant');
