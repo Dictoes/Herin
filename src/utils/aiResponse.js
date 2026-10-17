@@ -16,6 +16,7 @@ const messages = {
   PROVIDER_UNAVAILABLE:'Google AI is temporarily unavailable. Wait a minute before retrying.',
   TIMEOUT:'Generation timed out. Try fewer items or a smaller topic.',
   INVALID_RESPONSE:'Gemini returned empty or invalid study content. Try fewer items.',
+  QUIZ_REVIEW_FAILED:'The quiz could not pass its source and duplicate checks. Try fewer questions or a smaller page-range topic.',
   INSUFFICIENT_SOURCE:'The selected material did not contain enough information to generate the requested quiz. Select a different topic or request fewer questions.',
   DATABASE_ERROR:'The generated content could not be saved to Supabase. Retry without changing the request.',
   FUNCTION_NOT_DEPLOYED:'The generate-study-content backend is not deployed at the configured Supabase project.',

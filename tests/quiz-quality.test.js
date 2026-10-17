@@ -69,3 +69,32 @@ test('handler reads prior quizzes scoped to the authenticated owner, selected PD
  const result=await handler(new Request('https://test.invalid',{method:'POST',headers:{Authorization:'Bearer test'},body:JSON.stringify({...request,pdfId:id,requestId:id,topicId:id})}));
  assert.equal(result.status,200);assert.deepEqual(filters,[['pdf_id',id],['user_id',id],['topic_id',id]]);assert.equal(received.priorQuestions[0].correct_answer,q.correct_answer);
 });
+for(const type of ['multiple','identification','enumeration','application']){
+ test(`individual ${type} generation keeps verified questions if optional refill fails`,async()=>{
+  const item={...q,type};
+  if(type!=='multiple')delete item.choices;
+  if(type==='enumeration'){item.expected_items=['Oil','Gas'];item.correct_answer='Oil; Gas';}
+  let generations=0;
+  const result=await generateSections([section],{...request,quizType:type},{key:'test',fetcher:async(_url,options)=>{
+   const payload=JSON.parse(options.body);
+   if(payload.generationConfig.responseJsonSchema.properties.decisions)return response({decisions:[decision(0)]});
+   assert.deepEqual(payload.generationConfig.responseJsonSchema.properties.quiz_questions.items.properties.type.enum,[type]);
+   if(++generations>1)return new Response('',{status:429});
+   return response({quiz_questions:[item]});
+  }});
+  assert.equal(result.quiz_questions.length,1);assert.equal(result.quiz_questions[0].type,type);
+ });
+}
+test('partial review and JSON fences preserve only explicitly verified questions',async()=>{
+ const fetcher=async()=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:'```json\n'+JSON.stringify({decisions:[decision(0),{index:1,supported:'invalid'}]})+'\n```'}]}}]}));
+ assert.deepEqual(await reviewQuiz([q,other],[section],[],{key:'test',fetcher}),[q]);
+});
+test('a failed refill review keeps the verified quiz but excludes unreviewed replacements',async()=>{
+ let reviews=0;
+ const result=await generateSections([section],request,{key:'test',fetcher:async(_url,options)=>{
+  const payload=JSON.parse(options.body);
+  if(payload.generationConfig.responseJsonSchema.properties.decisions)return ++reviews===1?response({decisions:[decision(0)]}):response({decisions:[]});
+  return response({quiz_questions:reviews?[other]:[q]});
+ }});
+ assert.deepEqual(result.quiz_questions,[q]);
+});

@@ -274,8 +274,10 @@ export async function generateSections(sections, request, options) {
   if(['quiz','both'].includes(request.contentType)){
     const prior=options.priorQuestions || [];
     const audit=options.reviewQuiz || reviewQuiz;
+    let verified=[];
     try {
       combined.quiz_questions=await audit(combined.quiz_questions,sections,prior,{...options,signal});
+      verified=[...combined.quiz_questions];
       const types=request.quizType==='all'?quizTypes:[request.quizType||'multiple'];
       // One bounded refill pass. Never loop indefinitely to force a requested count.
       if(types.some(type=>combined.quiz_questions.filter(q=>q.type===type).length<request.quantity)){
@@ -290,7 +292,10 @@ export async function generateSections(sections, request, options) {
         for(const item of unique){if(![...prior,...combined.quiz_questions].some(q=>normalizeQuizText(q.question)===normalizeQuizText(item.question))&&combined.quiz_questions.filter(q=>q.type===item.type).length<request.quantity)combined.quiz_questions.push(item);}
       }
     }catch{
-      throw new StudyError('QUIZ_REVIEW_FAILED','Quiz uniqueness and source support could not be verified. Please retry with fewer questions.',502);
+      // A failed optional refill must not discard an already verified smaller quiz.
+      // Never fall back to the unreviewed candidates when the initial audit fails.
+      if(verified.length)combined.quiz_questions=verified;
+      else throw new StudyError('QUIZ_REVIEW_FAILED','Quiz uniqueness and source support could not be verified. Please retry with fewer questions.',502);
     }
   }
   if (request.contentType === 'quiz' && !combined.quiz_questions.length) throw new StudyError('INSUFFICIENT_SOURCE','The selected material could not support a valid quiz. Select a different topic or request fewer questions.',422);

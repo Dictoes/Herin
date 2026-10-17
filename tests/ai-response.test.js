@@ -8,6 +8,7 @@ test('nested provider errors show HTTP status without displaying upstream secret
 test('HTTP 200 error envelopes, legacy errors, missing backend, and network failures remain failures',async()=>{
  for(const [value,code] of [
   [{data:{success:false,error:{code:'MISSING_API_KEY'}}},'MISSING_API_KEY'],
+  [{error:{context:new Response(JSON.stringify({code:'QUIZ_REVIEW_FAILED'}),{status:502})}},'QUIZ_REVIEW_FAILED'],
   [{error:{context:new Response(JSON.stringify({code:'QUOTA'}),{status:429})}},'QUOTA'],
   [{error:{context:new Response('Not Found',{status:404})}},'FUNCTION_NOT_DEPLOYED'],
   [{error:{name:'FunctionsFetchError'}},'NETWORK_ERROR']
