@@ -12,10 +12,11 @@
 
 .yuki--avatar { width: 48px; height: 48px; }
 .yuki--medium { width: 168px; height: 168px; border-radius: 18px; }
-.yuki[data-state='idle'] .yuki-frame { animation: yuki-idle 8s step-end infinite; }
+.yuki[data-state='idle'] .yuki-frame { transform-origin: 50% 96%; animation: yuki-idle 4s ease-in-out infinite; }
+.yuki[data-visible='false'] .yuki-frame { animation-play-state: paused; }
 @keyframes yuki-idle {
-  0%, 90% { background-position: 0 0; }
-  82% { background-position: 33.3333% 0; }
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.006, 1.015); }
 }
 
 .ask-herin-page {

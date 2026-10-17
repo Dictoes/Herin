@@ -29,6 +29,32 @@ fs.mkdirSync(output,{recursive:true});
  await page.locator('.yuki').waitFor();
  assert.equal(await page.locator('.yuki').getAttribute('data-state'),'welcome');
  await page.waitForFunction(()=>document.querySelector('.yuki')?.dataset.state==='idle');
+ await page.locator('.yuki').scrollIntoViewIfNeeded();
+ assert.ok((await page.locator('.yuki-frame').evaluate(el=>getComputedStyle(el).backgroundImage)).includes('yuki-idle-sheet.png'));
+ const idleCheck=await page.evaluate(async()=>{
+  const yuki=document.querySelector('.yuki'),initial=yuki.getBoundingClientRect(),frames=new Set([Number(yuki.dataset.frame)]);
+  let stable=true;
+  const observer=new MutationObserver(()=>{frames.add(Number(yuki.dataset.frame));const box=yuki.getBoundingClientRect();stable&&=Math.abs(box.width-initial.width)<.1&&Math.abs(box.height-initial.height)<.1&&Math.abs(box.y-initial.y)<.1;});
+  observer.observe(yuki,{attributes:true,attributeFilter:['data-frame']});
+  await new Promise(resolve=>setTimeout(resolve,8000));observer.disconnect();
+  return {frames:[...frames].sort(),stable};
+ });
+ assert.deepEqual(idleCheck.frames,[0,1,2,3,4,5,6,7]);assert.ok(idleCheck.stable,'Idle must not shift surrounding layout');
+ await page.locator('.yuki').evaluate(el=>el.style.transform='translateY(-10000px)');
+ await page.locator('.yuki[data-visible="false"]').waitFor({state:'attached'});
+ const pausedFrame=await page.locator('.yuki').getAttribute('data-frame');
+ await page.waitForTimeout(1000);
+ assert.equal(await page.locator('.yuki').getAttribute('data-frame'),pausedFrame,'Offscreen animation should pause');
+ await page.locator('.yuki').evaluate(el=>el.style.transform='');
+ await page.locator('.yuki[data-visible="true"]').waitFor();
+ await page.emulateMedia({reducedMotion:'reduce'});
+ await page.waitForTimeout(100);
+ const stillFrame=await page.locator('.yuki').getAttribute('data-frame');
+ await page.waitForTimeout(900);
+ assert.equal(await page.locator('.yuki').getAttribute('data-frame'),stillFrame);
+ assert.equal(await page.locator('.yuki-frame').evaluate(el=>getComputedStyle(el).animationName),'none');
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.locator('.yuki[data-state="idle"]').waitFor();
  for(const width of [1440,390,320]) {
   await page.setViewportSize({width,height:900});
   for(const mode of ['light','dark']) {
@@ -148,6 +174,13 @@ fs.mkdirSync(output,{recursive:true});
   }).join('')+'</div>';
  });
  await page.screenshot({path:path.join(output,'sprite-crops.png'),fullPage:true});
+ await page.setViewportSize({width:1040,height:540});
+ await page.evaluate(async()=>{
+  const {YUKI_IDLE_FRAMES}=await import('/src/utils/yukiStates.js');
+  document.body.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,256px);gap:4px;background:#edf5f1">'+YUKI_IDLE_FRAMES.map(f=>`<span style="display:block;width:256px;height:256px;background-image:url(/yuki-idle-sheet.png);background-repeat:no-repeat;background-size:400% 200%;background-position:${f.column*100/3}% ${f.row*100}%"></span>`).join('')+'</div>';
+  await new Promise((resolve,reject)=>{const image=new Image();image.onload=resolve;image.onerror=reject;image.src='/yuki-idle-sheet.png';});
+ });
+ await page.screenshot({path:path.join(output,'idle-crops.png'),fullPage:true});
  assert.deepEqual(errors,[]);
  console.log('PASS: desktop/mobile light/dark, no overflow, welcome/idle, thinking, error/retry, citation filtering, notes, wrong/reassurance/correct, reduced motion. Simulated AI transport; no live AI call. Screenshots: '+output);
  } finally {await browser.close();}
