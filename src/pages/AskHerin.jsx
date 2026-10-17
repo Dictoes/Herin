@@ -183,11 +183,12 @@ export default function AskHerin() {
         <div className={`ask-herin-messages${messages.length ? ' has-messages' : ''}`} ref={listRef} aria-live="polite" aria-busy={busy}>
           {messages.length === 0 ? (
             <div className="ask-herin-welcome">
-              <Yuki state="welcome" size="medium" />
+              <Yuki state={pdfId ? 'welcome' : 'empty'} size="medium" label="Yuki study companion" />
               <div className="ask-herin-welcome-copy">
                 <p className="ask-herin-kicker">Hi, I’m Yuki.</p>
                 <h2>A little clarity, one question at a time.</h2>
                 <p>Ask about a concept in your material. If a detail isn’t in the sources, I’ll tell you.</p>
+                {!pdfId && <p className="ask-herin-selected-source">Choose a PDF or note above, and we’ll work through it together.</p>}
                 {pdfId && <p className="ask-herin-selected-source">Using excerpts from {currentPdf?.title || currentPdf?.name || 'selected PDF'}, relevant notes{selectedHighlightIds.size ? ', and selected highlights' : ''}.</p>}
                 <div className="ask-herin-suggestions" aria-label="Suggested questions">
                   {QUICK_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => {setInput(prompt); inputRef.current?.focus();}}>{prompt}</button>)}
@@ -196,7 +197,7 @@ export default function AskHerin() {
             </div>
           ) : (
             messages.map((message,index) => <article className={`ask-herin-message ask-herin-message--${message.role}`} key={`${index}-${message.role}`}>
-              {message.role === 'assistant' && <Yuki state="explaining" size="avatar" />}
+              {message.role === 'assistant' && <Yuki state="speaking" size="avatar" />}
               <div className="ask-herin-bubble">
                 {message.role === 'assistant' && <p className="ask-herin-grounding field-hint">{message.excerptCount ? `Based on ${message.excerptCount} selected excerpts, not a complete-document review.` : 'No supporting study excerpts were supplied.'}</p>}
                 {message.text.split(/(```[\s\S]*?```)/g).map((part,partIndex)=>part.startsWith('```') ? <pre className="ask-herin-code" key={partIndex}><code>{part.replace(/^```[^\n]*\n?/, '').replace(/```$/, '')}</code></pre> : <p key={partIndex}>{part}</p>)}
@@ -216,7 +217,8 @@ export default function AskHerin() {
           )}
           {busy && <div className="ask-herin-thinking" role="status"><Yuki state="thinking" size="avatar" /><span>Yuki is thinking</span><span className="ask-herin-thinking-dots" aria-hidden="true">…</span></div>}
           {status === 'error' && <div className="ask-herin-error" role="alert">
-            <span>{error}</span>
+            <Yuki state="error" size="avatar"/>
+            <div><span>{error}</span><p>We can try again when you’re ready.</p></div>
             <button type="button" onClick={() => void sendQuestion(messages[messages.length - 1]?.text || '',true)}><RotateCw size={15} aria-hidden="true" /> Retry</button>
           </div>}
         </div>

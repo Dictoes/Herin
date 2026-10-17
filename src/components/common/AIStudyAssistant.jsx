@@ -117,7 +117,8 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
     <GenerationAllowance busy={busy} onExhaustedChange={setQuotaExhausted}/>
     <div className="ai-actions">{[['flashcards','Generate Flashcards'],['quiz','Generate Quiz'],['both','Generate Both'],['summary','Summarize topic']].map(([type,label])=><button className={`btn ${type==='both'?'btn-primary':'btn-secondary'}`} key={type} disabled={busy||quotaExhausted||meta.status==='processing'||!Number.isInteger(Number(quantity))||quantity<1||quantity>30} onClick={()=>generate(type)}>{label}</button>)}</div>
     <p role="status" aria-live="polite">{busy&&<Loader2 className="ai-spinner" size={16}/>} {meta.status==='processing'&&!busy?'Extracting PDF text':status}{busy?' · Large PDFs may take longer. Results save automatically.':''}</p>
-    {error&&<div role="alert"><p>{error}</p>{retry.current&&<button className="btn btn-secondary" disabled={busy} onClick={()=>generate(retry.current.contentType,true)}>Retry AI generation</button>}</div>}
+    {busy&&<div className="yuki-status"><Yuki state="thinking" size="small"/><p>Yuki is working through your material.</p></div>}
+    {error&&!busy&&<div role="alert" className="yuki-status"><Yuki state="error" size="small"/><div><p>{error}</p><p>We can try again when you’re ready.</p>{retry.current&&<button className="btn btn-secondary" disabled={busy} onClick={()=>generate(retry.current.contentType,true)}>Retry AI generation</button>}</div></div>}
     {result&&!busy&&!error&&status==='Completed'&&<div className="ai-success" role="status">
       <Yuki state="quizCorrect" size="small"/>
       <div className="ai-success-bubble">{['quiz','both'].includes(result.contentType)?'Let’s go! Your quiz is ready!':result.contentType==='summary'?'Your summary is ready!':'Your flashcards are ready!'}</div>

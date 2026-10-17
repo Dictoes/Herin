@@ -8,6 +8,22 @@ export const YUKI_ROWS = Object.freeze({
   quizCorrect:5,
 });
 
+// Reuse the original six illustrated rows; additional meanings use gentle body motion.
+export const YUKI_REACTIONS = Object.freeze({
+  idle:{row:0,motion:'idle',still:0,label:'resting beside your study material'},
+  welcome:{row:1,motion:'greeting',still:0,label:'waving hello'},
+  notes:{row:2,motion:'encouraging',still:3,label:'helping with your notes'},
+  encouraging:{row:2,motion:'encouraging',still:3,label:'offering encouragement',frames:[3,2,3,3]},
+  thinking:{row:3,motion:'thinking',still:0,label:'thinking',loop:true,frames:[0,1,0,1]},
+  explaining:{row:3,motion:'speaking',still:2,label:'explaining your study material',frames:[2,3,2,3]},
+  speaking:{row:3,motion:'speaking',still:2,label:'sharing a study tip',frames:[2,3,2,3]},
+  quizWrong:{row:4,motion:'reassuring',still:3,label:'offering encouragement after an incorrect answer'},
+  quizCorrect:{row:5,motion:'happy',still:3,label:'happy about your progress'},
+  celebrating:{row:5,motion:'celebrating',still:2,label:'celebrating your completed quiz'},
+  error:{row:4,motion:'reassuring',still:3,label:'reassuring you after a problem',frames:[0,3,3,3]},
+  empty:{row:2,motion:'encouraging',still:3,label:'ready to help you get started',frames:[0,2,3,3]},
+});
+
 // Original 1774 x 887 PNG: exact 4 x 2 cells (443.5px), in reading order.
 // The closed-eye frame is a quick blink, not an extended sleeping pose.
 export const YUKI_IDLE_FRAMES = Object.freeze([

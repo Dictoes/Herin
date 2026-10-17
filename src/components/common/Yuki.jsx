@@ -1,10 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {YUKI_ROWS, YUKI_ROW_BOUNDS, YUKI_IDLE_FRAMES} from '../../utils/yukiStates';
-
-const ONCE_STATES = new Set(['welcome','notes','explaining','quizWrong','quizCorrect']);
+import {YUKI_REACTIONS, YUKI_ROW_BOUNDS, YUKI_IDLE_FRAMES} from '../../utils/yukiStates';
 
 export default function Yuki({state = 'idle', size = 'small', label, className = ''}) {
-  const safeState = Object.hasOwn(YUKI_ROWS,state) ? state : 'idle';
+  const safeState = Object.hasOwn(YUKI_REACTIONS,state) ? state : 'idle';
   const [animation, setAnimation] = useState({state:safeState,frame:0});
   const element = useRef(null);
   const [visible, setVisible] = useState(true);
@@ -32,7 +30,7 @@ export default function Yuki({state = 'idle', size = 'small', label, className =
     const idle = animation.state === 'idle';
     const duration = idle ? YUKI_IDLE_FRAMES[animation.frame].duration : animation.state === 'quizWrong' || animation.state === 'thinking' ? 800 : 600;
     const timer = window.setTimeout(() => {
-      setAnimation(current => ONCE_STATES.has(current.state) && current.frame === 3
+      setAnimation(current => current.state !== 'idle' && !YUKI_REACTIONS[current.state].loop && current.frame === 3
         ? {state:'idle',frame:0}
         : {...current,frame:(current.frame + 1) % (current.state === 'idle' ? 8 : 4)});
     }, duration);
@@ -40,8 +38,9 @@ export default function Yuki({state = 'idle', size = 'small', label, className =
   },[animation,visible,reducedMotion]);
 
   const activeState = animation.state;
-  const visibleFrame = reducedMotion ? (safeState === 'quizWrong' || safeState === 'quizCorrect' ? 3 : safeState === 'explaining' ? 2 : 0) : animation.frame;
-  const row = YUKI_ROWS[activeState];
+  const reaction = YUKI_REACTIONS[activeState];
+  const visibleFrame = reducedMotion ? reaction.still : reaction.frames?.[animation.frame] ?? animation.frame;
+  const row = reaction.row;
   const bounds = YUKI_ROW_BOUNDS[visibleFrame % 4];
   const top = bounds[row];
   const height = bounds[row + 1] - top;
@@ -62,12 +61,13 @@ export default function Yuki({state = 'idle', size = 'small', label, className =
   return (
     <span
       ref={element}
-      aria-label={label || `Yuki ${safeState === 'quizWrong' ? 'offering encouragement' : safeState === 'quizCorrect' ? 'celebrating' : safeState === 'thinking' ? 'thinking' : 'study companion'}`}
+      aria-label={label || `Yuki ${YUKI_REACTIONS[safeState].label}`}
       role="img"
       className={`yuki yuki--${size} ${className}`.trim()}
       data-state={activeState}
       data-frame={visibleFrame}
       data-visible={visible}
-    ><span className="yuki-frame" aria-hidden="true" style={frameStyle}/></span>
+      data-motion={reaction.motion}
+    ><span className="yuki-motion" aria-hidden="true"><span key={`${activeState}-${visibleFrame}`} className="yuki-frame" style={frameStyle}/></span></span>
   );
 }

@@ -18,7 +18,7 @@ export default function QuizResults({questions, session, onReset}) {
   return <section ref={resultsRef} className="card quiz-card quiz-results">
     <span className="badge badge-live">Session complete</span>
     <div className="quiz-yuki-response">
-      <Yuki state="quizCorrect" size="medium"/>
+      <Yuki state="celebrating" size="medium"/>
       <div><h2>{session.score || 0} of {questions.length} correct</h2>
         <p>{session.score === questions.length ? 'Well done! Take a moment to appreciate what you learned.' : "Every attempt helps you grow. Let's review the tricky ones together."}</p>
       </div>

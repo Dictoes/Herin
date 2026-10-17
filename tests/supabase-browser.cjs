@@ -64,6 +64,7 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
  }
  if(url.pathname==='/functions/v1/generate-study-content'){
   aiCalls++;const body=request.postDataJSON();assert.ok(body.pdfId);assert.ok(body.requestId);assert.ok(!JSON.stringify(body).includes('key'));
+  await new Promise(resolve=>setTimeout(resolve,700));
   if(aiFailure)return json({code:'QUOTA',message:'Quota reached'},429);
   const previous=tables.study_generations.find(g=>g.id===body.requestId);if(previous)return json(previous.result);
   const pdf=tables.pdfs.find(p=>p.id===body.pdfId);assert.ok(pdf);const generationId=body.requestId,created_at=new Date().toISOString();
@@ -146,7 +147,7 @@ await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locat
 const ai=page.getByRole('region',{name:'AI Herin Assistant'});
 await ai.getByText('20 of 20 generations remaining',{exact:true}).waitFor();
 await page.getByRole('button',{name:'AI Herin Assistant',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement.id),'ai-herin-assistant');
-await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
+await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.locator('.yuki[data-state="thinking"]').waitFor();assert.equal(await ai.locator('.ai-success').count(),0);await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
 await ai.getByText('19 of 20 generations remaining',{exact:true}).waitFor();
 await ai.getByText('Let’s go! Your quiz is ready!',{exact:true}).waitFor();assert.equal(await ai.locator('.ai-success .yuki').count(),1);
 await ai.getByRole('link',{name:'Review generated flashcards'}).click();await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('Light'));

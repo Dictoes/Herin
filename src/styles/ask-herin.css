@@ -8,16 +8,35 @@
   image-rendering: auto;
   border-radius: 10px;
 }
-.yuki-frame { display: block; flex: none; background-repeat: no-repeat; }
+.yuki-motion { display:flex; align-items:center; justify-content:center; width:100%; height:100%; transform-origin:50% 90%; }
+.yuki-frame { display: block; flex: none; background-repeat: no-repeat; animation:yuki-pose .18s ease-out; }
+@keyframes yuki-pose { from { opacity:.78; } to { opacity:1; } }
 
 .yuki--avatar { width: 48px; height: 48px; }
 .yuki--medium { width: 168px; height: 168px; border-radius: 18px; }
-.yuki[data-state='idle'] .yuki-frame { transform-origin: 50% 96%; animation: yuki-idle 4s ease-in-out infinite; }
-.yuki[data-visible='false'] .yuki-frame { animation-play-state: paused; }
+.yuki[data-motion='idle'] .yuki-motion { animation:yuki-idle 4s ease-in-out infinite; }
+.yuki[data-motion='greeting'] .yuki-motion { animation:yuki-greeting 1.2s ease-in-out infinite; }
+.yuki[data-motion='encouraging'] .yuki-motion { animation:yuki-nod 1.6s ease-in-out infinite; }
+.yuki[data-motion='thinking'] .yuki-motion { animation:yuki-thinking 3.2s ease-in-out infinite; }
+.yuki[data-motion='happy'] .yuki-motion { animation:yuki-happy .8s ease-in-out infinite; }
+.yuki[data-motion='celebrating'] .yuki-motion { animation:yuki-celebrate .8s ease-in-out infinite; }
+.yuki[data-motion='speaking'] .yuki-motion { animation:yuki-speaking 1.2s ease-in-out infinite; }
+.yuki[data-motion='reassuring'] .yuki-motion { animation:yuki-nod 2.4s ease-in-out infinite; }
+.yuki[data-visible='false'] .yuki-motion, .yuki[data-visible='false'] .yuki-frame { animation-play-state:paused; }
 @keyframes yuki-idle {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.006, 1.015); }
+  0%, 100% { transform:translateY(0); }
+  50% { transform:translateY(-1.5px); }
 }
+@keyframes yuki-greeting { 0%,100% {transform:translateY(0) rotate(0);} 40% {transform:translateY(-3px) rotate(-2deg);} 70% {transform:rotate(2deg);} }
+@keyframes yuki-nod { 0%,100% {transform:rotate(0);} 50% {transform:translateY(1px) rotate(1.5deg);} }
+@keyframes yuki-thinking { 0%,100% {transform:rotate(-1deg);} 50% {transform:translateY(-1px) rotate(1deg);} }
+@keyframes yuki-happy { 0%,100% {transform:translateY(0);} 50% {transform:translateY(-4px);} }
+@keyframes yuki-celebrate { 0%,100% {transform:translateY(0) rotate(0);} 40% {transform:translateY(-8px) rotate(-3deg);} 70% {transform:translateY(-3px) rotate(3deg);} }
+@keyframes yuki-speaking { 0%,100% {transform:translateY(0) rotate(0);} 50% {transform:translateY(-1px) rotate(1deg);} }
+.yuki-status { display:flex; align-items:center; gap:12px; margin:12px 0; }
+.yuki-status > div { min-width:0; flex:1; }
+.yuki-status p { margin:4px 0; }
+@media (prefers-reduced-motion: reduce) { .yuki[data-motion] .yuki-motion, .yuki .yuki-frame { animation:none; transform:none; } }
 
 .ask-herin-page {
   width: min(100%, 980px);
