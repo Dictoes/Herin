@@ -1,6 +1,8 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
-import {Loader2, Sparkles} from 'lucide-react';
+import {Loader2, Sparkles, Trash2, BookOpen} from 'lucide-react';
+import Yuki from './Yuki';
+import ConfirmDialog from './ConfirmDialog';
 import {useApp} from '../../context/AppContext';
 import {supabase} from '../../lib/supabase';
 import {cloudUser, flushCloud, refreshCloud} from '../../utils/cloudStore';
@@ -15,6 +17,8 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
   const [quantity,setQuantity]=useState(10),[difficulty,setDifficulty]=useState('mixed'),[topicId,setTopicId]=useState(''),[quizType,setQuizType]=useState('all');
   const [topics,setTopics]=useState([]),[summaries,setSummaries]=useState([]),[status,setStatus]=useState('Ready'),[error,setError]=useState('');
   const [busy,setBusy]=useState(false),[result,setResult]=useState(null),[topicForm,setTopicForm]=useState(false);
+  const [deleting,setDeleting]=useState(null),[deleteBusy,setDeleteBusy]=useState(false),[summaryFeedback,setSummaryFeedback]=useState(null);
+  const deleteFlight=useRef(false);
   const [topicName,setTopicName]=useState(''),[start,setStart]=useState(1),[end,setEnd]=useState(meta.pageCount||1);
   const flight=useRef(false),retry=useRef(null),mounted=useRef(true),autoGenerate=useRef(false);
   const owner=useRef(cloudUser());
@@ -73,13 +77,26 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
       setTopics(p=>[...p,data]);setTopicId(data.id);setTopicForm(false);setTopicName('');
     }catch(e){setError(e.message);}
   }
+  async function deleteSummary(){
+    if(!deleting||deleteFlight.current||!current())return;
+    deleteFlight.current=true;setDeleteBusy(true);setSummaryFeedback(null);
+    try {
+      const pdfId=await databaseId(meta.id,owner.current);
+      const {data,error:deleteError}=await supabase.from('study_generations')
+        .update({result:{...deleting.result,summaries:[]}})
+        .eq('id',deleting.id).eq('pdf_id',pdfId).eq('user_id',owner.current).eq('status','completed').select('id').single();
+      if(deleteError||!data)throw Error('Summary could not be deleted. Please try again.');
+      if(current()){setSummaries(items=>items.filter(item=>item.id!==deleting.id));setDeleting(null);setSummaryFeedback({message:'Summary deleted.',error:false});}
+    }catch(e){if(current())setSummaryFeedback({message:e.message,error:true});}
+    finally{deleteFlight.current=false;if(current())setDeleteBusy(false);}
+  }
   return <section id="ai-herin-assistant" tabIndex={-1} className="card ai-study" aria-label="AI Herin Assistant">
     <header className="ai-heading">
       <span className="ai-heading-icon" aria-hidden="true"><Sparkles size={24}/></span>
-      <div><h2>AI Herin Assistant</h2>
+      <div><h2>AI Herin Assistant <span className="ai-grounded"><BookOpen size={14} aria-hidden="true"/> PDF grounded</span></h2>
       <p>Generate from this PDF only. Selected text is processed by Gemini. Review answers against the source.</p></div>
     </header>
-    <div className="ai-controls">
+    <div className="ai-settings"><div className="ai-controls">
       <label className="field">Selected PDF<select className="select" value={meta.id} disabled={busy} onChange={e=>navigate(`/pdfs/${e.target.value}`)}>{app.pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
       <label className="field">Class<select className="select" value={meta.classId||''} disabled={busy} onChange={e=>app.updatePdfMeta(meta.id,{classId:e.target.value})}><option value="">No class linked</option>{app.classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       <label className="field">Topic<select className="select" value={topicId} disabled={busy} onChange={e=>setTopicId(e.target.value)}><option value="">Entire PDF</option>{topics.map(t=><option key={t.id} value={t.id}>{t.name} (pages {t.start_page}–{t.end_page})</option>)}</select></label>
@@ -94,10 +111,20 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
       <label className="field">Last page<input className="input" required type="number" min={start} max={meta.pageCount||9999} value={end} onChange={e=>setEnd(e.target.value)}/></label>
       <button className="btn btn-secondary" disabled={busy}>Save topic</button>
     </form>}
+    </div>
     <div className="ai-actions">{[['flashcards','Generate Flashcards'],['quiz','Generate Quiz'],['both','Generate Both'],['summary','Summarize topic']].map(([type,label])=><button className={`btn ${type==='both'?'btn-primary':'btn-secondary'}`} key={type} disabled={busy||meta.status==='processing'||!Number.isInteger(Number(quantity))||quantity<1||quantity>30} onClick={()=>generate(type)}>{label}</button>)}</div>
     <p role="status" aria-live="polite">{busy&&<Loader2 className="ai-spinner" size={16}/>} {meta.status==='processing'&&!busy?'Extracting PDF text':status}{busy?' · Large PDFs may take longer. Results save automatically.':''}</p>
     {error&&<div role="alert"><p>{error}</p>{retry.current&&<button className="btn btn-secondary" disabled={busy} onClick={()=>generate(retry.current.contentType,true)}>Retry AI generation</button>}</div>}
+    {result&&!busy&&!error&&status==='Completed'&&<div className="ai-success" role="status">
+      <Yuki state="quizCorrect" size="small"/>
+      <div className="ai-success-bubble">{['quiz','both'].includes(result.contentType)?'Let’s go! Your quiz is ready!':result.contentType==='summary'?'Your summary is ready!':'Your flashcards are ready!'}</div>
+    </div>}
     {result&&<div><p>Saved {result.flashcardCount} flashcards and {result.quizCount} quiz questions.</p>{['quiz','both'].includes(result.contentType)&&(()=>{const allowed=result.requestedType==='all'?Object.keys(quizTypeLabels):[result.requestedType];const counts=Object.fromEntries(allowed.map(type=>[type,result.quiz_questions.filter(q=>q.type===type).length]));const targetTotal=result.requestedQuantity*allowed.length;const fewer=allowed.some(type=>counts[type]<result.requestedQuantity);return fewer?<p role="status">The selected material supported {result.quizCount} of {targetTotal} requested questions.{result.requestedType==='all'?` Counts by type: ${allowed.map(type=>`${quizTypeLabels[type]} ${counts[type]}/${result.requestedQuantity}`).join(', ')}.`:''}</p>:null;})()}<Link className="btn btn-secondary" to={`/flashcards?pdf=${meta.id}`}>Review generated flashcards</Link> <Link className="btn btn-secondary" to={`/quiz?pdf=${meta.id}`}>Start generated quiz</Link></div>}
-    {summaries.map(g=><details key={g.id}><summary>Saved summary · {new Date(g.created_at).toLocaleString()}</summary>{g.result.summaries.map((s,i)=><div key={i}><p>Pages {s.pages.join(', ')}</p><p className="ai-summary">{s.text}</p></div>)}</details>)}
+    <section className="ai-summaries" aria-label="Saved summaries"><h3>Saved summaries</h3>
+      {summaryFeedback&&<p role={summaryFeedback.error?'alert':'status'}>{summaryFeedback.message}</p>}
+      {!summaries.length&&<p className="field-hint">No saved summaries yet. Choose Summarize topic to create one.</p>}
+      {summaries.map(g=><div className="ai-summary-row" key={g.id}><details><summary>Saved summary · {new Date(g.created_at).toLocaleString()}</summary>{g.result.summaries.map((s,i)=><div key={i}><p>Pages {s.pages.join(', ')}</p><p className="ai-summary">{s.text}</p></div>)}</details><button type="button" className="btn btn-ghost btn-icon" disabled={deleteBusy||busy} aria-label={`Delete summary from ${new Date(g.created_at).toLocaleString()}`} title="Delete summary" onClick={()=>{setSummaryFeedback(null);setDeleting(g);}}><Trash2 size={17} aria-hidden="true"/></button></div>)}
+    </section>
+    {deleting&&<ConfirmDialog title="Delete saved summary?" confirmLabel={deleteBusy?'Deleting…':'Delete summary'} message={<>{'Delete this saved summary? Your PDF, quiz, and flashcards will be kept.'}{summaryFeedback?.error&&<span role="alert"> {summaryFeedback.message}</span>}</>} onCancel={()=>{if(!deleteFlight.current)setDeleting(null);}} onConfirm={deleteSummary}/>}
   </section>;
 }

@@ -195,6 +195,24 @@ progress::-moz-progress-bar { background: var(--accent-mint); border-radius: 4px
 .viewer-panel, .notes-panel { border-radius: 6px; box-shadow: none; }
 .ai-heading-icon { background: transparent; border: 0; color: var(--primary-dark); }
 .ai-study-assistant { box-shadow: none; background: var(--surface); }
+.ai-study .ai-heading h2 { flex-wrap: wrap; font-size: clamp(20px, 2.5vw, 26px); gap: 12px; }
+.ai-grounded { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--primary-dark); background: var(--primary-tint); border-radius: 20px; padding: 5px 9px; }
+.ai-settings { padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.ai-settings .input, .ai-settings .select { background: var(--surface); color: var(--ink); }
+.ai-settings > .btn { margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0; color: var(--primary-dark); }
+.ai-study .ai-actions { border-top: 0; margin-top: 0; padding-top: 16px; }
+.ai-success { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 18px 0; padding: 12px 18px; background: var(--primary-tint); border: 1px solid var(--border); border-radius: 8px; }
+.ai-success .yuki { width: 88px; height: 88px; }
+.ai-success-bubble { position: relative; max-width: 320px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--paper); color: var(--ink); font-size: 14px; }
+.ai-success-bubble::before { content: ''; position: absolute; left: -6px; top: calc(50% - 5px); width: 10px; height: 10px; background: var(--paper); border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); transform: rotate(45deg); }
+.ai-summaries { margin-top: 24px; border-top: 1px solid var(--border); padding-top: 18px; }
+.ai-summaries h3 { font-size: 16px; margin-bottom: 12px; }
+.ai-summary-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; border-top: 1px solid var(--border); }
+.ai-summary-row summary { padding: 14px 0; color: var(--ink-soft); }
+.ai-summary-row > button { margin-top: 4px; }
+.ai-summary-row details { min-width: 0; overflow-wrap: anywhere; }
+.ai-summary-row summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+@media (max-width: 480px) { .ai-settings { padding: 12px; } .ai-settings > .ai-controls > .field:last-child { grid-column: 1 / -1; } .ai-success { padding: 10px; gap: 10px; } .ai-success .yuki { width: 72px; height: 72px; } }
 .ask-herin-page { max-width: 980px; }
 .ask-herin-header h2 { font-size: 22px; }
 .ask-herin-chat { border-radius: 8px; box-shadow: none; }

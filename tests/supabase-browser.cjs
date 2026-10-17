@@ -95,6 +95,12 @@ await context.route('https://ycejqtvemiesuiflyqmw.supabase.co/**',async route=>{
   }
   if(method==='GET'){const rows=tables[table].filter(r=>r.user_id===user.id&&[...url.searchParams].every(([key,value])=>!value.startsWith('eq.')||String(r[key])===value.slice(3)));return json(url.searchParams.get('limit')==='0'?[]:rows);}
   if(rejectWrites)return json({message:'Test: write denied by RLS',code:'42501'},403);
+  if(method==='PATCH'&&table==='study_generations'){
+   assert.equal(url.searchParams.get('user_id'),'eq.'+user.id);
+   const row=tables[table].find(r=>'eq.'+r.id===url.searchParams.get('id')&&'eq.'+r.pdf_id===url.searchParams.get('pdf_id'));
+   if(!row)return json({message:'Missing row'},406);
+   Object.assign(row,request.postDataJSON());return json({id:row.id});
+  }
   if(method==='POST'){
    const body=request.postDataJSON(),rows=Array.isArray(body)?body:[body];
    assert.equal(new Set(rows.map(row=>row.id||row.user_id)).size,rows.length,"No duplicate conflict keys in an upsert");
@@ -135,11 +141,35 @@ await page.getByText('Biology-course.pdf',{exact:true}).click();await page.locat
 const ai=page.getByRole('region',{name:'AI Herin Assistant'});
 await page.getByRole('button',{name:'AI Herin Assistant',exact:true}).click();assert.equal(await page.evaluate(()=>document.activeElement.id),'ai-herin-assistant');
 await ai.getByRole('button',{name:'Generate Both',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();assert.equal(aiCalls,1);
+await ai.getByText('Let’s go! Your quiz is ready!',{exact:true}).waitFor();assert.equal(await ai.locator('.ai-success .yuki').count(),1);
 await ai.getByRole('link',{name:'Review generated flashcards'}).click();await page.getByRole('button',{name:'Tap to reveal answer'}).click();assert.ok((await page.locator('.study-answer-text').textContent()).includes('Light'));
 await page.reload();await page.getByRole('button',{name:'Tap to reveal answer'}).waitFor();assert.ok(await page.getByText('AI: What does photosynthesis use?',{exact:true}).count());
 await navigate('quiz');await page.locator('.quiz-options button').filter({hasText:'Light'}).click();await page.getByText('The PDF describes light as the input.').waitFor();await page.getByRole('button',{name:'See results',exact:true}).click();await page.getByText('Quiz history',{exact:true}).waitFor();assert.equal(tables.quiz_attempts.length,1);await page.reload();await page.getByText('Quiz history',{exact:true}).waitFor();assert.equal(tables.quiz_attempts.length,1);
 await navigate('pdfs/'+tables.pdfs[0].data.id);await ai.getByRole('button',{name:'Summarize topic',exact:true}).click();await ai.getByText('Completed',{exact:true}).waitFor();await ai.getByText(/Saved summary/).click();await ai.getByText('Photosynthesis uses light.',{exact:true}).waitFor();
-aiFailure=true;await ai.getByRole('button',{name:'Generate Flashcards',exact:true}).click();await ai.getByText(/AI quota or rate limit reached. Wait before retrying./).waitFor();aiFailure=false;await ai.getByRole('button',{name:'Retry AI generation'}).click();await ai.getByText('Completed',{exact:true}).waitFor();
+await ai.getByText('Your summary is ready!',{exact:true}).waitFor();
+for(const width of [390,1440]){
+ await page.setViewportSize({width,height:1000});
+ for(const mode of ['light','dark']){
+  await page.evaluate(mode=>document.documentElement.dataset.mode=mode,mode);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  fs.mkdirSync('test-results',{recursive:true});
+  await ai.screenshot({path:`test-results/assistant-${width}-${mode}.png`});
+ }
+}
+const summaryRow=ai.locator('.ai-summary-row').first();
+await summaryRow.getByRole('button',{name:/Delete summary from/}).click();
+assert.equal(await summaryRow.locator('details').getAttribute('open'),'');
+await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await ai.locator('.ai-summary-row').count(),1);
+await summaryRow.locator('summary').click();
+await summaryRow.getByRole('button',{name:/Delete summary from/}).click();
+assert.equal(await summaryRow.locator('details').getAttribute('open'),null);
+rejectWrites=true;await page.getByRole('button',{name:'Delete summary',exact:true}).click();
+await page.getByRole('dialog').getByText('Summary could not be deleted. Please try again.',{exact:true}).waitFor();
+rejectWrites=false;await page.getByRole('button',{name:'Delete summary',exact:true}).click();
+await ai.getByText('Summary deleted.',{exact:true}).waitFor();assert.equal(await ai.locator('.ai-summary-row').count(),0);
+await page.reload();await ai.getByText('No saved summaries yet. Choose Summarize topic to create one.',{exact:true}).waitFor();
+assert.ok(tables.study_generations.length>0);assert.ok(tables.flashcards.length>0);assert.ok(tables.quizzes.length>0);
+aiFailure=true;await ai.getByRole('button',{name:'Generate Flashcards',exact:true}).click();await ai.getByText(/AI quota or rate limit reached. Wait before retrying./).waitFor();assert.equal(await ai.locator('.ai-success').count(),0);aiFailure=false;await ai.getByRole('button',{name:'Retry AI generation'}).click();await ai.getByText('Completed',{exact:true}).waitFor();await ai.getByText('Your flashcards are ready!',{exact:true}).waitFor();
 for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));fs.mkdirSync('test-results',{recursive:true});await page.screenshot({path:`test-results/ai-study-${width}.png`,fullPage:true});}
 await page.locator('.pdf-text-layer').evaluate(el=>{const span=[...el.querySelectorAll('span')].find(s=>s.textContent.includes('Photosynthesis is'));if(!span)throw Error('No definition');const range=document.createRange();range.selectNodeContents(span);getSelection().removeAllRanges();getSelection().addRange(range);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
 await page.getByRole('button',{name:'PDF Yellow highlight',exact:true}).click();await saved();assert.ok(tables.highlights.length);assert.ok(tables.flashcards.length);assert.ok(tables.quizzes.length);
