@@ -8,6 +8,25 @@ const coursePages = [
   {pageNum:3,text:'Stopping sight distance is the distance a driver needs to perceive a hazard and stop.'},
   {pageNum:4,text:'Railway ballast distributes wheel loads and provides drainage.'},
 ];
+test('natural page questions retrieve only the requested physical PDF page', () => {
+  const context=buildAskContext({...material,extractedText:coursePages,question:'Can you explain page 3 briefly?'});
+  assert.deepEqual(context.map(source=>source.page),[3]);
+  assert.match(context[0].text,/Stopping sight distance/);
+  assert.deepEqual(buildAskContext({...material,extractedText:coursePages,question:'Explain page 30'}),[]);
+});
+test('follow-ups can retrieve the current page and previous page without relabeling sources', () => {
+  const context=buildAskContext({...material,extractedText:coursePages,preferredPage:4,question:'How does this idea relate to the previous section?'});
+  assert.deepEqual(context.map(source=>source.page),[4,3]);
+});
+test('code examples retrieve actual code even when the question has no shared keywords', () => {
+  const context=buildAskContext({...material,notes:[],selectedHighlightIds:new Set(),question:'Give me an example of this code.',extractedText:[{pageNum:1,text:'Course Outcomes: programming'},{pageNum:3,text:'def double(x):\n    return x * 2'}]});
+  assert.deepEqual(context.map(source=>source.page),[3]);
+  assert.match(context[0].text,/return x \* 2/);
+});
+test('natural concept questions use selected notes; unreadable PDFs do not invent sources', () => {
+  assert.ok(buildAskContext({...material,question:'What does this concept mean in simpler words?'}).length);
+  assert.deepEqual(buildAskContext({...material,notes:[],highlights:[],extractedText:[],question:'What does this concept mean in simpler words?'}),[]);
+});
 test('general topic requests select actual lessons instead of administrative opening slides', () => {
   for (const question of ['summarize this topic','Summarize this PDF','What is the main topic of this PDF?','Explain a key idea from my material']) {
     const context=buildAskContext({...material,notes:[],selectedHighlightIds:new Set(),extractedText:coursePages,question});

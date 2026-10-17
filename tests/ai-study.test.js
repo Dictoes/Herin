@@ -37,6 +37,9 @@ test('Ask sends supplied context only to Gemini and constrains source pages',asy
     payload=JSON.parse(options.body);
     assert.equal(options.headers['x-goog-api-key'],'server-test-key');
     assert.match(payload.systemInstruction.parts[0].text,/Plants use light/);
+    assert.match(payload.systemInstruction.parts[0].text,/Illustrative example \(not from the PDF\)/);
+    assert.match(payload.systemInstruction.parts[0].text,/specific page/);
+    assert.match(payload.systemInstruction.parts[0].text,/ask which snippet or page/);
     assert.doesNotMatch(payload.systemInstruction.parts[0].text,/private omitted material/);
     assert.deepEqual(payload.generationConfig.responseJsonSchema.properties.source_pages.items.enum,[2]);
     return response({answer:'The source says plants use light.',source_pages:[2]});

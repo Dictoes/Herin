@@ -4,7 +4,7 @@ import {ArrowUp, BookOpen, Check, RotateCw, Sparkles, X} from 'lucide-react';
 import AppLayout from '../components/Layout/AppLayout';
 import {useApp} from '../context/AppContext';
 import Yuki from '../components/common/Yuki';
-import {buildAskContext} from '../utils/askHerinContext';
+import {buildAskContext, flattenPages} from '../utils/askHerinContext';
 import {buildAskRequest} from '../utils/askHerinRequest';
 import {supabase} from '../lib/supabase';
 
@@ -62,8 +62,8 @@ export default function AskHerin() {
     notes,
     highlights,
     selectedHighlightIds,
-    preferredPage:pageHint,
-  }),[pdfId,pdfs,app.getExtractedText,notes,highlights,selectedHighlightIds,pageHint]);
+    preferredPage:[...messages].reverse().find(message=>message.role==='assistant' && message.sourcePages?.length===1)?.sourcePages[0] || pageHint,
+  }),[pdfId,pdfs,app.getExtractedText,notes,highlights,selectedHighlightIds,pageHint,messages]);
 
   const sendQuestion = useCallback(async (question, retry = false) => {
     const cleanQuestion = question.trim();
@@ -73,6 +73,18 @@ export default function AskHerin() {
     const next = retry ? messages : [...messages,{role:'user',text:cleanQuestion}];
     const body = retry && retryRef.current ? retryRef.current : buildAskRequest({question:cleanQuestion,history:previous,context:contextFor(cleanQuestion)});
     const context = body.context;
+    let guidance = '';
+    if (!currentPdf) guidance = 'Choose a PDF or note before asking about its contents.';
+    else if (!context.length) {
+      const hasText = flattenPages(app.getExtractedText(pdfId)).some(page=>page.text.trim()) || notes.some(note=>note.pdfId===pdfId && (note.content || note.text || '').trim());
+      const requestedPage = cleanQuestion.match(/\bpage\s+(\d+)\b/i)?.[1];
+      guidance = requestedPage ? `I could not read extracted text for page ${requestedPage}. Please check that page or share its text.` : !hasText ? 'I could not read text from this material. It may be scanned or not yet extracted. Open the document to process it, or add readable notes.' : 'I could not find supporting text for that question in the selected material. Which concept or snippet would you like clarified?';
+    }
+    if (guidance) {
+      setMessages([...next,{role:'assistant',text:guidance,pdfId,sourcePages:[],excerptCount:0}]);
+      setInput(''); setError(''); setStatus('idle'); requestRef.current=false;
+      return;
+    }
     retryRef.current = body;
     setMessages(next);
     setInput('');
@@ -97,7 +109,7 @@ export default function AskHerin() {
     } finally {
       requestRef.current = false;
     }
-  },[contextFor,busy,messages,pdfId]);
+  },[contextFor,busy,messages,pdfId,currentPdf,app.getExtractedText,notes]);
 
   const lastQuestion = useMemo(() => [...messages].reverse().find(item => item.role === 'user')?.text || '',[messages]);
 
@@ -187,7 +199,7 @@ export default function AskHerin() {
               {message.role === 'assistant' && <Yuki state="explaining" size="avatar" />}
               <div className="ask-herin-bubble">
                 {message.role === 'assistant' && <p className="ask-herin-grounding field-hint">{message.excerptCount ? `Based on ${message.excerptCount} selected excerpts, not a complete-document review.` : 'No supporting study excerpts were supplied.'}</p>}
-                <p>{message.text}</p>
+                {message.text.split(/(```[\s\S]*?```)/g).map((part,partIndex)=>part.startsWith('```') ? <pre className="ask-herin-code" key={partIndex}><code>{part.replace(/^```[^\n]*\n?/, '').replace(/```$/, '')}</code></pre> : <p key={partIndex}>{part}</p>)}
                 {message.role === 'assistant' && message.sourcePages?.length > 0 && (
                   <p className="ask-herin-citations">Source pages: {message.sourcePages.join(', ')}</p>
                 )}

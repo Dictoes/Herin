@@ -2,6 +2,7 @@
   'about', 'after', 'again', 'also', 'answer', 'could', 'explain', 'from', 'have',
   'into', 'make', 'more', 'please', 'same', 'that', 'their', 'them', 'there',
   'these', 'this', 'what', 'when', 'where', 'which', 'with', 'would', 'your',
+  'can', 'you', 'give', 'example', 'briefly', 'does', 'mean', 'simpler', 'words', 'concept', 'idea', 'relate', 'previous', 'section', 'code', 'snippet', 'page',
 ]);
 
 function queryTerms(question) {
@@ -40,7 +41,7 @@ function selectRelevantText(text, terms, maxLength) {
   return selected;
 }
 
-function flattenPages(value) {
+export function flattenPages(value) {
   if (typeof value === 'string') return [{text:value}];
   if (value && typeof value === 'object' && Array.isArray(value.pages)) return flattenPages(value.pages);
   if (value && typeof value === 'object' && typeof value.text === 'string') return [{text:value.text}];
@@ -62,9 +63,11 @@ function isCourseOverview(text) {
 }
 
 export function buildAskContext({question, pdfId, pdfs, extractedText, notes, highlights, selectedHighlightIds, preferredPage, maxSources = 12}) {
+  const requestedPage = Number(question.match(/\bpage\s+(\d+)\b/i)?.[1]) || null;
+  const referential = /\b(?:this|that) (?:code|concept|idea|snippet)|\bprevious section\b/i.test(question);
   const broad = /^(explain a key idea from my material|what are the main points of my notes\??|help me understand this highlight|(?:please )?(?:summari[sz]e|explain|give (?:me )?(?:a |an )?(?:summary|overview) of) (?:this|the|my|the selected|the whole|the entire) (?:page|notes|material|pdf|document|topic|lesson|chapter)|what (?:is|are) the main (?:topic|topics|points|ideas)(?: of (?:this|the) (?:pdf|document|lesson))?)\s*[?.!]?$/i.test(question.trim());
   const terms = broad ? [] : queryTerms(question);
-  if (!terms.length && !broad) return [];
+  if (!terms.length && !broad && !requestedPage && !referential) return [];
   const pdf = pdfs.find(item => item.id === pdfId);
   if (!pdf) return [];
   const limit = Math.max(1, Math.min(12, maxSources));
@@ -80,15 +83,25 @@ export function buildAskContext({question, pdfId, pdfs, extractedText, notes, hi
   // Explicit selections get reserved slots, without crowding out the PDF entirely.
   const personal = [...noteSources.slice(0,1), ...sample(highlightSources,3)].slice(0,limit);
   const pages = flattenPages(extractedText).filter(page => page.text.trim());
+  if (requestedPage || (referential && preferredPage > 0)) {
+    const target = requestedPage || preferredPage;
+    const exact = pages.filter(page => page.page === target);
+    if (exact.length && /\bprevious section\b/i.test(question)) exact.push(...pages.filter(page => page.page === target - 1));
+    // Never substitute another page when the requested page is unreadable or absent.
+    return exact.slice(0,limit).map(page => ({kind:'pdf',title:(pdf.title || pdf.name || 'Current PDF').slice(0,180),page:page.page,text:selectRelevantText(page.text,[],6000)}));
+  }
+  const codeRequest = /\b(?:code|snippet)\b/i.test(question);
+  const codePages = codeRequest ? pages.filter(page => /```|\b(?:function|def|class|const|let|var|return|print|console\.log)\b|[{};]|\w+\s*\([^)]*\)/.test(page.text)) : [];
+  if (codePages.length) return sample(codePages,limit).map(page => ({kind:'pdf',title:(pdf.title || pdf.name || 'Current PDF').slice(0,180),text:selectRelevantText(page.text,[],2200),...(page.page ? {page:page.page} : {})}));
   const rankedPages = pages.map(page => ({...page, score:scoreText(page.text, terms)}))
-    .filter(page => broad || page.score > 0)
+    .filter(page => broad || referential || page.score > 0)
     .sort((a,b) => b.score - a.score || Number(b.page === preferredPage) - Number(a.page === preferredPage));
   const slots = limit - personal.length;
   // Broad prompts sample across the document, not just its opening pages.
   const lessonPages = rankedPages.filter(page => !isCourseOverview(page.text));
-  const chosen = broad ? sample(lessonPages.length ? lessonPages : rankedPages, slots) : rankedPages.slice(0,slots);
+  const chosen = broad || referential ? sample(lessonPages.length ? lessonPages : rankedPages, slots) : rankedPages.slice(0,slots);
   const allocation = Math.min(2200, Math.floor(12000 / Math.max(1,chosen.length)));
   const pdfSources = chosen.map(page => ({kind:'pdf', title:(pdf.title || pdf.name || 'Current PDF').slice(0,180),
-    text:selectRelevantText(page.text,terms,allocation), ...(page.page ? {page:page.page} : {})})).filter(source => source.text);
+    text:selectRelevantText(page.text,broad || referential ? [] : terms,allocation), ...(page.page ? {page:page.page} : {})})).filter(source => source.text);
   return [...pdfSources,...personal];
 }

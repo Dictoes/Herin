@@ -271,6 +271,7 @@
 .quiz-review-dropdown > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .quiz-review-dropdown .quiz-review-heading { margin: 0 0 16px; }
 .quiz-back-top { margin-top: 12px; }
+.ask-herin-code { max-width: 100%; overflow-x: auto; padding: 12px; border: 1px solid var(--border); border-radius: 8px; white-space: pre; font-size: 13px; }
 
 @media (max-width: 680px) {
   .ask-herin-page { min-height: calc(100dvh - 80px); gap: 14px; }
