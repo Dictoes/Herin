@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {sameQuizFact,reviewQuiz} from '../supabase/functions/generate-study-content/quizQuality.js';
+import {sameQuizFact,reviewQuiz,isCourseAdministration} from '../supabase/functions/generate-study-content/quizQuality.js';
 import {validateOutput,generateSections} from '../supabase/functions/generate-study-content/core.js';
 import {createHandler} from '../supabase/functions/generate-study-content/handler.js';
 const fact='Pipelines provide continuous flow for specialized cargo such as oil, gas, and water.';
@@ -13,6 +13,32 @@ const other={...q,question:'Which step comes first in the route survey workflow?
 const response=value=>new Response(JSON.stringify({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(value)}]}}]}));
 const reviewFetch=decisions=>async()=>response({decisions});
 const decision=(index,evidence=fact)=>({index,supported:true,duplicate_of:null,evidence});
+test('course prerequisites, overviews, outcomes and policies are rejected even when source-supported',async()=>{
+ const stems=[
+  'What course serves as the direct prerequisite for CE331 Highway and Railroad Engineering?',
+  'What are the course outcomes?',
+  'What does the course overview describe?',
+  'Which learning objective is listed for this module?',
+  'What is the grading policy?',
+  'How many credit units does this course have?',
+ ];
+ for(const question of stems){
+  const item={...q,type:'identification',question,correct_answer:'CE221',explanation:'This detail is listed in the introduction.'};delete item.choices;
+  assert.ok(isCourseAdministration(item));
+  assert.deepEqual(validateOutput({quiz_questions:[item]},{...request,quizType:'identification'},section).quiz_questions,[]);
+  assert.deepEqual(await reviewQuiz([item],[{text:'[Page 17]\nCE221 is the prerequisite course.',pages:[17]}],[],{key:'test',fetcher:reviewFetch([decision(0,'CE221 is the prerequisite course.')])}),[]);
+ }
+});
+test('technical lesson prerequisites and engineering requirements are not course administration',()=>{
+ for(const question of ['What is the prerequisite for laying the pavement surface?','What drainage requirements apply to railway ballast?','What determines the course of a river?']){
+  assert.equal(isCourseAdministration({question,correct_answer:'Compaction',explanation:'The foundation must be compacted before paving.'}),false);
+ }
+ assert.equal(isCourseAdministration(q),false);
+});
+test('an overview-only PDF returns insufficient source rather than administrative questions',async()=>{
+ const item={...q,question:'What course is the prerequisite for CE331?',correct_answer:'CE221',choices:['CE221','CE222','CE223','CE224']};
+ await assert.rejects(generateSections([section],request,{key:'test',fetcher:async()=>response({quiz_questions:[item]})}),e=>e.code==='INSUFFICIENT_SOURCE');
+});
 test('normalization rejects identical questions and repeated choices despite punctuation and whitespace',()=>{
  assert.equal(validateOutput({quiz_questions:[q,{...q,question:' WHICH DESCRIBES A KEY CHARACTERISTIC OF PIPELINE TRANSPORTATION!!! '}]},request,section).quiz_questions.length,1);
  assert.equal(validateOutput({quiz_questions:[{...q,choices:['Oil',' OIL! ','Water','Gas'],correct_answer:'Oil'}]},request,section).quiz_questions.length,0);

@@ -1,4 +1,4 @@
-import {normalizeQuizText, reviewQuiz} from './quizQuality.js';
+import {normalizeQuizText, reviewQuiz, isCourseAdministration} from './quizQuality.js';
  // Runtime-independent generation pipeline. No credentials or source text are logged.
 export class StudyError extends Error {
   constructor(code, message, status = 400) { super(message); this.code = code; this.status = status; }
@@ -96,7 +96,7 @@ export function validateOutput(value, request, section) {
       } else {
         const allowedTypes = request.quizType === 'all' ? ['multiple','identification','enumeration','application'] : [request.quizType || 'multiple'];
         const question = validQuizQuestion(item,section.pages,allowedTypes);
-        if (!question) continue;
+        if (!question || isCourseAdministration(question)) continue;
         const normalized = normalizeQuizText(question.question);
         if (seen.has(normalized)) continue;
         seen.add(normalized);
@@ -124,6 +124,7 @@ export async function callGemini(section, request, {key, model = 'gemini-3.5-fla
   const instruction = [
     'You are an educational study assistant. Use only the study material provided below. Do not invent facts. Do not use outside information.',
     'Focus on the lesson itself: concepts, definitions, explanations, processes, relationships, applications, and worked examples.',
+    'Exclude administrative and introductory course information: course overviews, descriptions, codes, prerequisites/corequisites, enrollment requirements, learning outcomes/objectives, grading, attendance rules, instructor details, required textbooks, credit units, and syllabus structure. Even when stated in the PDF, these are not quiz facts. For example, never ask which course is the prerequisite for CE331. Instead test the actual highway and railroad engineering concepts taught in the lesson. If only administrative content is available, return no quiz questions.',
     'Course or descriptive titles, course codes, module/chapter/lesson numbers, page numbers, filenames, instructor names, and school details are navigation or administrative metadata, not learning content. Never ask students to recall that metadata or use it as an answer, distractor, or summary point. Use headings only to understand the lesson beneath them.',
     'Write standalone questions without phrases such as "in Module 1", "according to CE331", or "on page 12". Do not prefix questions, answers, or summary points with item numbers or decorative titles. For example, ask "What is the first step in transportation planning?", not "What is the title of Module 1?" or "What is the course code?".',
     'Preserve numbers essential to the lesson, including formulas, measurements, dates, quantities, technical standards, and ordered process steps. Do not remove factual numbers indiscriminately. Apply these rules to flashcards, quizzes, and summaries.',
