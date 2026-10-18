@@ -1,12 +1,30 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {YUKI_REACTIONS, YUKI_ROW_BOUNDS, YUKI_IDLE_FRAMES} from '../../utils/yukiStates';
+import {YUKI_REACTIONS, YUKI_ROW_BOUNDS, YUKI_IDLE_FRAMES, yukiFrameDuration} from '../../utils/yukiStates';
+
+let artworkReady;
+function preloadArtwork() {
+  artworkReady ||= Promise.all(['yuki-study-helper.png','yuki-idle-sheet.png'].map(file => new Promise((resolve,reject) => {
+    const image = new Image();
+    image.onload = () => {if (image.decode) image.decode().then(resolve,reject); else resolve();};
+    image.onerror = reject;
+    image.src = `${import.meta.env.BASE_URL}${file}`;
+  }))).catch(error => {artworkReady = null; throw error;});
+  return artworkReady;
+}
 
 export default function Yuki({state = 'idle', size = 'small', label, className = ''}) {
   const safeState = Object.hasOwn(YUKI_REACTIONS,state) ? state : 'idle';
   const [animation, setAnimation] = useState({state:safeState,frame:0});
   const element = useRef(null);
   const [visible, setVisible] = useState(true);
+  const [ready, setReady] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+
+  useEffect(() => {
+    let active = true;
+    preloadArtwork().then(() => {if (active) setReady(true);}).catch(() => {});
+    return () => {active = false;};
+  }, []);
 
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -24,18 +42,17 @@ export default function Yuki({state = 'idle', size = 'small', label, className =
     return () => {observer?.disconnect();document.removeEventListener('visibilitychange',update);};
   }, []);
 
-  useEffect(() => {setAnimation({state:safeState,frame:0});}, [safeState,reducedMotion]);
+  useEffect(() => {if (ready) setAnimation({state:safeState,frame:0});}, [safeState,reducedMotion,ready]);
   useEffect(() => {
-    if (reducedMotion || !visible) return undefined;
-    const idle = animation.state === 'idle';
-    const duration = idle ? YUKI_IDLE_FRAMES[animation.frame].duration : animation.state === 'quizWrong' || animation.state === 'thinking' ? 800 : 600;
+    if (reducedMotion || !visible || !ready) return undefined;
+    const duration = yukiFrameDuration(animation.state, animation.frame);
     const timer = window.setTimeout(() => {
       setAnimation(current => current.state !== 'idle' && !YUKI_REACTIONS[current.state].loop && current.frame === 3
         ? {state:'idle',frame:0}
         : {...current,frame:(current.frame + 1) % (current.state === 'idle' ? 8 : 4)});
     }, duration);
     return () => window.clearTimeout(timer);
-  },[animation,visible,reducedMotion]);
+  },[animation,visible,reducedMotion,ready]);
 
   const activeState = animation.state;
   const reaction = YUKI_REACTIONS[activeState];
@@ -68,6 +85,6 @@ export default function Yuki({state = 'idle', size = 'small', label, className =
       data-frame={visibleFrame}
       data-visible={visible}
       data-motion={reaction.motion}
-    ><span className="yuki-motion" aria-hidden="true"><span key={`${activeState}-${visibleFrame}`} className="yuki-frame" style={frameStyle}/></span></span>
+    ><span className="yuki-motion" aria-hidden="true"><span className="yuki-frame" style={frameStyle}/></span></span>
   );
 }

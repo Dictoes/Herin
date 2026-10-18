@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {YUKI_IDLE_FRAMES, YUKI_REACTIONS} from '../src/utils/yukiStates.js';
+import {YUKI_IDLE_FRAMES, YUKI_REACTIONS, yukiFrameDuration} from '../src/utils/yukiStates.js';
 
 test('idle atlas maps the supplied full-resolution 4 by 2 artwork in reading order', () => {
   const png=readFileSync(new URL('../public/yuki-idle-sheet.png',import.meta.url));
@@ -10,6 +10,16 @@ test('idle atlas maps the supplied full-resolution 4 by 2 artwork in reading ord
   assert.deepEqual(YUKI_IDLE_FRAMES.map(f=>[f.column,f.row]),[[0,0],[1,0],[2,0],[3,0],[0,1],[1,1],[2,1],[3,1]]);
   assert.ok(YUKI_IDLE_FRAMES[4].duration<=180,'Closed eyes should be a brief blink');
   assert.ok(YUKI_IDLE_FRAMES.reduce((sum,f)=>sum+f.duration,0)>=7000,'Idle should stay gentle');
+});
+
+test('blink timing varies, stays brief, and never changes reaction expression timing',()=>{
+  assert.equal(yukiFrameDuration('idle',3,()=>0),2500);
+  assert.equal(yukiFrameDuration('idle',3,()=>.999),6496);
+  assert.equal(yukiFrameDuration('idle',4,()=>0),110);
+  assert.equal(yukiFrameDuration('idle',4,()=>.999),159);
+  for(const state of Object.keys(YUKI_REACTIONS).filter(s=>s!=='idle')) {
+    for(let frame=0;frame<4;frame++)assert.equal(yukiFrameDuration(state,frame,()=>0),yukiFrameDuration(state,frame,()=>.999));
+  }
 });
 
 test('all reactions use existing source poses with accessible meanings and only thinking loops',()=>{

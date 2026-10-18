@@ -37,6 +37,15 @@ export const YUKI_IDLE_FRAMES = Object.freeze([
   {column:3,row:1,duration:1800},
 ]);
 
+// Only the idle atlas has a compatible neutral closed-eye pose (frame 4).
+// Do not substitute smiling, waving, or chin-resting reaction poses to fake a blink.
+export function yukiFrameDuration(state, frame, random = Math.random) {
+  if (state !== 'idle') return state === 'quizWrong' || state === 'thinking' ? 800 : 600;
+  if (frame === 3) return 2500 + Math.floor(random() * 4000);
+  if (frame === 4) return 110 + Math.floor(random() * 50);
+  return YUKI_IDLE_FRAMES[frame].duration;
+}
+
 // Transparent row separators measured per column: the artwork crosses the
 // nominal 256px grid. Preserve ears/paws without altering the supplied PNG.
 export const YUKI_ROW_BOUNDS = [

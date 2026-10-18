@@ -27,19 +27,40 @@ fs.mkdirSync(output,{recursive:true});
  });
  await page.goto(base+'/#/ask?pdf=p');
  await page.locator('.yuki').waitFor();
+ const monitorYuki=()=>{
+  window.yukiFlashViolations=JSON.parse(sessionStorage.getItem('test:yuki-flash-violations')||'[]');
+  const sprites=new WeakMap();
+  const check=()=>{
+   for(const mascot of document.querySelectorAll('.yuki')){
+    const frame=mascot.querySelector('.yuki-frame');
+    if(sprites.has(mascot)&&sprites.get(mascot)!==frame)window.yukiFlashViolations.push('Sprite remounted');
+    sprites.set(mascot,frame);
+    for(const node of [mascot,mascot.querySelector('.yuki-motion'),frame]){
+     const style=getComputedStyle(node);
+     if(style.opacity!=='1'||style.filter!=='none')window.yukiFlashViolations.push('Opacity or color filter changed');
+    }
+    if(getComputedStyle(frame).backgroundImage==='none')window.yukiFlashViolations.push('Blank sprite');
+   }
+   if(window.yukiFlashViolations.length)sessionStorage.setItem('test:yuki-flash-violations',JSON.stringify(window.yukiFlashViolations));
+   requestAnimationFrame(check);
+  };check();
+ };
+ await page.addInitScript(monitorYuki);
+ await page.evaluate(monitorYuki);
  assert.equal(await page.locator('.yuki').getAttribute('data-state'),'welcome');
  await page.waitForFunction(()=>document.querySelector('.yuki')?.dataset.state==='idle');
  await page.locator('.yuki').scrollIntoViewIfNeeded();
  assert.ok((await page.locator('.yuki-frame').evaluate(el=>getComputedStyle(el).backgroundImage)).includes('yuki-idle-sheet.png'));
  const idleCheck=await page.evaluate(async()=>{
   const yuki=document.querySelector('.yuki'),initial=yuki.getBoundingClientRect(),frames=new Set([Number(yuki.dataset.frame)]);
-  let stable=true;
-  const observer=new MutationObserver(()=>{frames.add(Number(yuki.dataset.frame));const box=yuki.getBoundingClientRect();stable&&=Math.abs(box.width-initial.width)<.1&&Math.abs(box.height-initial.height)<.1&&Math.abs(box.y-initial.y)<.1;});
+  let stable=true,closedAt=null;const blinks=[];
+  const observer=new MutationObserver(()=>{const frame=Number(yuki.dataset.frame);frames.add(frame);if(frame===4)closedAt=performance.now();else if(closedAt!==null){blinks.push({duration:performance.now()-closedAt,reopened:frame===5});closedAt=null;}const box=yuki.getBoundingClientRect();stable&&=Math.abs(box.width-initial.width)<.1&&Math.abs(box.height-initial.height)<.1&&Math.abs(box.y-initial.y)<.1;});
   observer.observe(yuki,{attributes:true,attributeFilter:['data-frame']});
-  await new Promise(resolve=>setTimeout(resolve,8000));observer.disconnect();
-  return {frames:[...frames].sort(),stable};
+  await new Promise(resolve=>setTimeout(resolve,14000));observer.disconnect();
+  return {frames:[...frames].sort(),stable,blinks};
  });
  assert.deepEqual(idleCheck.frames,[0,1,2,3,4,5,6,7]);assert.ok(idleCheck.stable,'Idle must not shift surrounding layout');
+ assert.ok(idleCheck.blinks.length&&idleCheck.blinks.every(b=>b.duration>=90&&b.duration<350&&b.reopened),'Blink should briefly close then reopen');
  await page.locator('.yuki').evaluate(el=>el.style.transform='translateY(-10000px)');
  await page.locator('.yuki[data-visible="false"]').waitFor({state:'attached'});
  const pausedFrame=await page.locator('.yuki').getAttribute('data-frame');
@@ -202,6 +223,7 @@ fs.mkdirSync(output,{recursive:true});
  await page.waitForTimeout(1000);
  assert.deepEqual(await page.locator('#reaction-gallery .yuki').evaluateAll(els=>els.map(el=>el.dataset.frame)),stillReactions.map(item=>item.frame));
  await page.screenshot({path:path.join(output,'reduced-reactions.png'),fullPage:true});
+ assert.deepEqual(await page.evaluate(()=>window.yukiFlashViolations),[],'No fades, filters, blank backgrounds or sprite remounts');
  assert.deepEqual(errors,[]);
  console.log('PASS: desktop/mobile light/dark, no overflow, welcome/idle, thinking, error/retry, citation filtering, notes, wrong/reassurance/correct, reduced motion. Simulated AI transport; no live AI call. Screenshots: '+output);
  } finally {await browser.close();}
