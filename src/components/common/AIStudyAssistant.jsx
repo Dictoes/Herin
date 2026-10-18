@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Link, useNavigate} from 'react-router-dom';
-import {Loader2, Sparkles, Trash2, BookOpen} from 'lucide-react';
+import {Loader2, Sparkles, Trash2, BookOpen, FileText, GraduationCap, Hash, BarChart3, ListChecks, Plus} from 'lucide-react';
 import Yuki from './Yuki';
 import ConfirmDialog from './ConfirmDialog';
 import GenerationAllowance from './GenerationAllowance';
@@ -12,6 +12,10 @@ import {storage} from '../../utils/storage';
 import {processPdf} from '../../utils/processPdf';
 import {readStudyResponse} from '../../utils/aiResponse';
 import {quizTypeOptions,quizTypeLabels} from '../../utils/quizTypes';
+
+function FieldLabel({icon:Icon, children}) {
+  return <span className="ai-field-label"><Icon size={16} strokeWidth={1.8} aria-hidden="true"/>{children}</span>;
+}
 
 export default function AIStudyAssistant({meta,initialGenerate}) {
   const app=useApp(),navigate=useNavigate();
@@ -99,14 +103,14 @@ export default function AIStudyAssistant({meta,initialGenerate}) {
       <p>Generate from this PDF only. Selected text is processed by Gemini. Review answers against the source.</p></div>
     </header>
     <div className="ai-settings"><div className="ai-controls">
-      <label className="field">Selected PDF<select className="select" value={meta.id} disabled={busy} onChange={e=>navigate(`/pdfs/${e.target.value}`)}>{app.pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
-      <label className="field">Class<select className="select" value={meta.classId||''} disabled={busy} onChange={e=>app.updatePdfMeta(meta.id,{classId:e.target.value})}><option value="">No class linked</option>{app.classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
-      <label className="field">Topic<select className="select" value={topicId} disabled={busy} onChange={e=>setTopicId(e.target.value)}><option value="">Entire PDF</option>{topics.map(t=><option key={t.id} value={t.id}>{t.name} (pages {t.start_page}–{t.end_page})</option>)}</select></label>
-      <label className="field">{quizType==='all'?'Questions per type':'Questions (total)'}<input className="input" type="number" min="1" max="30" value={quantity} disabled={busy} onChange={e=>setQuantity(e.target.value)}/></label>
-      <label className="field">Difficulty<select className="select" value={difficulty} disabled={busy} onChange={e=>setDifficulty(e.target.value)}>{['mixed','easy','medium','hard'].map(d=><option key={d} value={d}>{d[0].toUpperCase()+d.slice(1)}</option>)}</select></label>
-      <label className="field">Quiz type<select className="select" value={quizType} disabled={busy} onChange={e=>setQuizType(e.target.value)}>{quizTypeOptions.map(({value,label})=><option key={value} value={value}>{label}</option>)}</select></label>
+      <label className="field"><FieldLabel icon={FileText}>Selected PDF</FieldLabel><select className="select" value={meta.id} disabled={busy} onChange={e=>navigate(`/pdfs/${e.target.value}`)}>{app.pdfs.filter(p=>p.kind!=='note').map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
+      <label className="field"><FieldLabel icon={GraduationCap}>Class</FieldLabel><select className="select" value={meta.classId||''} disabled={busy} onChange={e=>app.updatePdfMeta(meta.id,{classId:e.target.value})}><option value="">No class linked</option>{app.classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+      <label className="field"><FieldLabel icon={BookOpen}>Topic</FieldLabel><select className="select" value={topicId} disabled={busy} onChange={e=>setTopicId(e.target.value)}><option value="">Entire PDF</option>{topics.map(t=><option key={t.id} value={t.id}>{t.name} (pages {t.start_page}–{t.end_page})</option>)}</select></label>
+      <label className="field"><FieldLabel icon={Hash}>{quizType==='all'?'Questions per type':'Questions (total)'}</FieldLabel><input className="input" type="number" min="1" max="30" value={quantity} disabled={busy} onChange={e=>setQuantity(e.target.value)}/></label>
+      <label className="field"><FieldLabel icon={BarChart3}>Difficulty</FieldLabel><select className="select" value={difficulty} disabled={busy} onChange={e=>setDifficulty(e.target.value)}>{['mixed','easy','medium','hard'].map(d=><option key={d} value={d}>{d[0].toUpperCase()+d.slice(1)}</option>)}</select></label>
+      <label className="field"><FieldLabel icon={ListChecks}>Quiz type</FieldLabel><select className="select" value={quizType} disabled={busy} onChange={e=>setQuizType(e.target.value)}>{quizTypeOptions.map(({value,label})=><option key={value} value={value}>{label}</option>)}</select></label>
     </div>
-    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>setTopicForm(p=>!p)}>Add page-range topic</button>
+    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={()=>setTopicForm(p=>!p)}><Plus size={16} strokeWidth={1.8} aria-hidden="true"/>Add page-range topic</button>
     {topicForm&&<form className="ai-controls" onSubmit={addTopic}>
       <label className="field">Topic name<input className="input" required maxLength={150} value={topicName} onChange={e=>setTopicName(e.target.value)}/></label>
       <label className="field">First page<input className="input" required type="number" min="1" max={meta.pageCount||9999} value={start} onChange={e=>setStart(e.target.value)}/></label>

@@ -199,6 +199,8 @@ progress::-moz-progress-bar { background: var(--accent-mint); border-radius: 4px
 .ai-grounded { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; color: var(--primary-dark); background: var(--primary-tint); border-radius: 20px; padding: 5px 9px; }
 .ai-settings { padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .ai-settings .input, .ai-settings .select { background: var(--surface); color: var(--ink); }
+.ai-field-label { display: inline-flex; align-items: center; gap: 7px; line-height: 1.4; }
+.ai-field-label svg { flex: 0 0 16px; color: inherit; }
 .ai-settings > .btn { margin-top: 4px; border-top: 1px solid var(--border); border-radius: 0; color: var(--primary-dark); }
 .ai-study .ai-actions { border-top: 0; margin-top: 0; padding-top: 16px; }
 .ai-allowance { margin-top: 18px; padding: 14px 0; border-block: 1px solid var(--border); color: var(--ink-soft); font-size: 12px; }
